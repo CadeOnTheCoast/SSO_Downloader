@@ -2,10 +2,10 @@
 """Automated SSO PDF downloader and parser.
 
 This script scrapes Alabama's ADEM eFile site for all Sanitary Sewer Overflow
+
 (SSO) reports filed in 2024. It downloads each PDF using Playwright so the
 session cookies are preserved, extracts key fields with ``pdfplumber``/OCR, and
 writes the results to ``sso_reports_2024.csv``.
-"""
 
 import json
 import logging
@@ -20,6 +20,7 @@ import pdfplumber
 from pdf2image import convert_from_path
 import pytesseract
 from playwright.sync_api import sync_playwright
+
 
 # Constants
 BASE_URL = "https://app.adem.alabama.gov/eFile/Default.aspx"
@@ -104,6 +105,7 @@ def scrape_links() -> List[DocLink]:
 
 
 def download_pdfs(links: List[DocLink]) -> None:
+
     """Download each PDF using Playwright so cookies are preserved."""
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)

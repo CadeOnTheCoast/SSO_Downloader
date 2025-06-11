@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import time
+import sys
 from dataclasses import dataclass
 from typing import List, Dict
 
@@ -50,20 +51,50 @@ def scrape_links() -> List[DocLink]:
     logging.info("Scraping document links from eFile")
     links: List[DocLink] = []
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
+        DEV_MODE = "--show" in sys.argv
+        browser = pw.chromium.launch(headless=not DEV_MODE, slow_mo=250 if DEV_MODE else 0)
         page = browser.new_page()
         page.goto(BASE_URL)
 
-        # enable date range
-        page.check("input[id$='DateRangeCheckBox']")
-        page.evaluate(
-            f"document.getElementById('ctl00_ContentPlaceHolder1_txtStartDate').value='{START_DATE}';")
-        page.evaluate(
-            f"document.getElementById('ctl00_ContentPlaceHolder1_txtEndDate').value='{END_DATE}';")
-        page.click("[id$='ddlDocumentTypes_Input']")
-        page.fill("[id$='ddlDocumentTypes_Input']", "SSO")
-        page.click("input[id$='SearchButton']")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("input[id$='DateRangeCheckBox']", timeout=10000)
+        page.click("input[id$='DateRangeCheckBox']")
+        page.wait_for_selector("input[name='ctl00$ContentPlaceHolder1$StartDateTextBox']", timeout=10000)
+        page.wait_for_selector("input[name='ctl00$ContentPlaceHolder1$EndDateTextBox']", timeout=10000)
+
+        page.evaluate(f"""
+            let el = document.getElementById('ctl00_ContentPlaceHolder1_StartDateTextBox');
+            el.removeAttribute('readonly');
+            el.value = '{START_DATE}';
+        """)
+        page.evaluate(f"""
+            let el = document.getElementById('ctl00_ContentPlaceHolder1_EndDateTextBox');
+            el.removeAttribute('readonly');
+            el.value = '{END_DATE}';
+        """)
+        time.sleep(1)
+
+        # Step 4: Click the "Custom Query" checkbox
+        page.evaluate("""
+            document.getElementById("ctl00_ContentPlaceHolder1_CheckBoxCustomQuery").click();
+        """)
+        time.sleep(2)  # allow time for postback
+
+        # Step 5: Select "SSO" in the ListBoxTypes
+        page.select_option("#ctl00_ContentPlaceHolder1_ListBoxTypes", value="SSO")
+        time.sleep(0.5)
+
+        # Step 5.5: Check the "Water" media area checkbox
+        page.check("#ctl00_ContentPlaceHolder1_LibraryCheckBoxList_2")
+        time.sleep(0.5)
+
+        # Step 6: Click the "Add Type" button
+        page.click("#ctl00_ContentPlaceHolder1_ButtonAddType")
+        time.sleep(1)
+
+        # Step 7: Click the "Search" button
+        page.click("#ctl00_ContentPlaceHolder1_SearchButton")
+        time.sleep(5)  # wait for results to load
+
         page.wait_for_selector("table#ctl00_ContentPlaceHolder1_DocsGridView")
 
         page_num = 1
@@ -75,16 +106,25 @@ def scrape_links() -> List[DocLink]:
                 break
             for row in rows:
                 cells = row.query_selector_all("td")
-                link = cells[0].query_selector("a")
-                url = link.get_attribute("href")
-                fname = cells[7].inner_text().strip()
+                if len(cells) < 2:
+                    continue
+
+                link_el = cells[0].query_selector("a")
+                if not link_el:
+                    continue
+
+                url = link_el.get_attribute("href")
+                if not url:
+                    continue
+
+                fname = cells[7].inner_text().strip() if len(cells) > 7 else "unknown.pdf"
                 metadata = {
-                    "master_id": cells[1].inner_text().strip(),
-                    "facility": cells[2].inner_text().strip(),
-                    "permit": cells[3].inner_text().strip(),
-                    "county": cells[4].inner_text().strip(),
-                    "date": cells[5].inner_text().strip(),
-                    "type": cells[6].inner_text().strip(),
+                    "master_id": cells[1].inner_text().strip() if len(cells) > 1 else "",
+                    "facility": cells[2].inner_text().strip() if len(cells) > 2 else "",
+                    "permit": cells[3].inner_text().strip() if len(cells) > 3 else "",
+                    "county": cells[4].inner_text().strip() if len(cells) > 4 else "",
+                    "date": cells[5].inner_text().strip() if len(cells) > 5 else "",
+                    "type": cells[6].inner_text().strip() if len(cells) > 6 else "",
                 }
                 links.append(DocLink(url, fname, metadata))
             # next page

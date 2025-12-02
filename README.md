@@ -59,7 +59,7 @@ A lightweight FastAPI layer is available for quick filtered downloads and previe
 - **Endpoints:**
   - `/` – minimal HTML UI with dropdowns for utility/county and date range inputs
   - `/download` – CSV download for the selected filters
-  - `/summary` – brief JSON volume summary (uses `sso_analytics` helpers)
+  - `/api/ssos/summary` – dashboard-ready aggregate JSON (with `/summary` as a legacy alias)
   - `/filters` – metadata for populating UI dropdowns
 - **Config:** honors the same `SSO_API_BASE_URL`, `SSO_API_KEY`, and `SSO_API_TIMEOUT` env vars used by the CLI.
 
@@ -78,7 +78,7 @@ Module G layers a human-friendly dashboard on top of the existing FastAPI app an
   - CSV download button that reuses the `/download` endpoint.
 - **Dashboard API endpoints:**
   - `/filters` – utility and county options for form controls.
-  - `/summary` – overall volume metrics and top utilities.
+  - `/api/ssos/summary` – aggregate metrics (totals plus by-month, by-utility, and volume buckets).
   - `/series/by_date` – time series JSON for charts (`points` with date, count, total_volume_gallons).
   - `/series/by_utility` – grouped bar data by utility (`bars` with label, count, total_volume_gallons).
   - `/records` – normalized record list for the table view.

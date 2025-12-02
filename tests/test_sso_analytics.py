@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 
 from sso_analytics import (
+    build_dashboard_summary,
     GroupVolumeSummary,
     QAIssue,
     SpillRecordSummary,
+    summarize_by_month,
+    summarize_by_utility,
+    summarize_by_volume_bucket,
     summarize_overall_volume,
     summarize_volume_by_county,
     summarize_volume_by_month,
@@ -136,5 +140,61 @@ def test_top_utilities_and_spills_by_volume():
     top_spills = top_spills_by_volume(records, n=2)
     assert [s.sso_id for s in top_spills] == ["3", "2"]
     assert isinstance(top_spills[0], SpillRecordSummary)
+
+
+def test_volume_bucket_and_dashboard_summary():
+    records = [
+        _record(
+            sso_id="1",
+            utility_id="U1",
+            utility_name="Alpha",
+            county="Mobile",
+            date_sso_began=datetime(2024, 1, 5),
+            volume_gallons=500,
+        ),
+        _record(
+            sso_id="2",
+            utility_id="U1",
+            utility_name="Alpha",
+            county="Mobile",
+            date_sso_began=datetime(2024, 1, 20),
+            volume_gallons=5_000,
+        ),
+        _record(
+            sso_id="3",
+            utility_id="U2",
+            utility_name="Beta",
+            county="Baldwin",
+            date_sso_began=datetime(2024, 2, 1),
+            volume_gallons=150_000,
+        ),
+        _record(
+            sso_id="4",
+            utility_id=None,
+            utility_name=None,
+            county="Baldwin",
+            date_sso_began=None,
+            volume_gallons=None,
+        ),
+    ]
+
+    by_bucket = summarize_by_volume_bucket(records)
+    assert by_bucket[0]["bucket_label"].startswith("0")
+    assert any(row["bucket_label"] == "unknown" for row in by_bucket)
+    assert sum(row["spill_count"] for row in by_bucket) == 4
+
+    by_month = summarize_by_month(records)
+    assert [row["month"] for row in by_month] == ["2024-01", "2024-02"]
+    assert by_month[0]["spill_count"] == 2
+
+    by_utility = summarize_by_utility(records)
+    assert by_utility[0]["utility_id"] == "U2"
+    assert by_utility[1]["utility_id"] == "U1"
+
+    summary = build_dashboard_summary(records)
+    assert summary["summary_counts"]["total_records"] == 4
+    assert summary["summary_counts"]["distinct_utilities"] == 2
+    assert summary["summary_counts"]["date_range"]["min"] == "2024-01-05"
+    assert summary["by_volume_bucket"] == by_bucket
 
 

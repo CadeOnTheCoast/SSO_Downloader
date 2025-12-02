@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
 
 from sso_analytics import (
+    build_dashboard_summary,
     summarize_overall_volume,
     summarize_volume_by_utility,
     top_utilities_by_volume,
@@ -179,11 +180,7 @@ def download_csv(
     )
 
 
-@app.get("/summary")
-def summary(
-    params: SSOQueryParams = Depends(),
-    client: SSOClient = Depends(get_client),
-):
+def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
     _ensure_filters(params)
     query = params.to_sso_query()
     try:
@@ -191,19 +188,32 @@ def summary(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    safe_limit = params.bounded_limit(default=5000, maximum=20000)
+
     try:
-        raw_records = client.fetch_ssos(query=query, limit=params.limit)
+        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     records_norm = normalize_sso_records(raw_records)
-    overall = summarize_overall_volume(records_norm)
-    top_util = top_utilities_by_volume(records_norm, n=5)
+    return build_dashboard_summary(records_norm)
 
-    return {
-        "overall": asdict(overall),
-        "top_utilities": [asdict(item) for item in top_util],
-    }
+
+@app.get("/api/ssos/summary")
+def dashboard_summary(
+    params: SSOQueryParams = Depends(),
+    client: SSOClient = Depends(get_client),
+):
+    return _build_dashboard_payload(params, client)
+
+
+@app.get("/summary")
+def summary(
+    params: SSOQueryParams = Depends(),
+    client: SSOClient = Depends(get_client),
+):
+    """Legacy summary endpoint kept for backward compatibility."""
+    return _build_dashboard_payload(params, client)
 
 
 @app.get("/series/by_date")

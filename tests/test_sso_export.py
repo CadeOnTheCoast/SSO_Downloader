@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import csv
 import gzip
+from io import StringIO
 from pathlib import Path
 
-from sso_export import write_ssos_to_csv
+from sso_export import write_ssos_to_csv, write_ssos_to_csv_filelike
 
 
 def test_write_ssos_to_csv_creates_expected_headers(tmp_path: Path):
@@ -44,3 +45,16 @@ def test_write_ssos_to_csv_handles_empty(tmp_path: Path):
     write_ssos_to_csv([], str(output))
 
     assert output.read_text(encoding="utf-8") == ""
+
+
+def test_write_ssos_to_csv_filelike():
+    buffer = StringIO()
+    records = [{"a": 1, "b": 2}]
+
+    write_ssos_to_csv_filelike(records, buffer)
+
+    buffer.seek(0)
+    reader = csv.DictReader(buffer)
+    rows = list(reader)
+    assert reader.fieldnames == ["a", "b"]
+    assert rows[0]["a"] == "1"

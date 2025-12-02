@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>SSO Downloader</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        label { display: block; margin-top: 1rem; }
+        select, input { padding: 0.5rem; width: 240px; }
+        button { margin-top: 1rem; padding: 0.5rem 1rem; }
+        #summary { margin-top: 1.5rem; white-space: pre-wrap; border: 1px solid #ddd; padding: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>SSO Downloader</h1>
+    <p>Choose filters to download sanitary sewer overflow records as CSV.</p>
+
+    <form id="filters-form">
+        <label>
+            Utility
+            <select id="utility">
+                <option value="">-- any utility --</option>
+            </select>
+        </label>
+
+        <label>
+            County
+            <select id="county">
+                <option value="">-- any county --</option>
+            </select>
+        </label>
+
+        <label>
+            Start date
+            <input type="date" id="start_date" />
+        </label>
+
+        <label>
+            End date
+            <input type="date" id="end_date" />
+        </label>
+
+        <div>
+            <button type="button" id="download">Download CSV</button>
+            <button type="button" id="preview">Preview summary</button>
+        </div>
+    </form>
+
+    <div id="summary" aria-live="polite"></div>
+
+    <script>
+        async function loadFilters() {
+            const response = await fetch('/filters');
+            const data = await response.json();
+            const utilitySelect = document.getElementById('utility');
+            const countySelect = document.getElementById('county');
+
+            (data.utilities || []).forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = `${item.name} (${item.id})`;
+                utilitySelect.appendChild(option);
+            });
+
+            (data.counties || []).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                countySelect.appendChild(option);
+            });
+        }
+
+        function buildQueryParams() {
+            const params = new URLSearchParams();
+            const utility = document.getElementById('utility').value;
+            const county = document.getElementById('county').value;
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+
+            if (utility) params.set('utility_id', utility);
+            if (county) params.set('county', county);
+            if (startDate) params.set('start_date', startDate);
+            if (endDate) params.set('end_date', endDate);
+
+            return params;
+        }
+
+        function ensureFilters(params) {
+            return params.has('utility_id') || params.has('county') || params.has('start_date') || params.has('end_date');
+        }
+
+        document.getElementById('download').addEventListener('click', () => {
+            const params = buildQueryParams();
+            if (!ensureFilters(params)) {
+                alert('Please select at least one filter (utility, county, or date range).');
+                return;
+            }
+            window.location.href = `/download?${params.toString()}`;
+        });
+
+        document.getElementById('preview').addEventListener('click', async () => {
+            const params = buildQueryParams();
+            const summaryEl = document.getElementById('summary');
+            summaryEl.textContent = 'Loading summary...';
+            if (!ensureFilters(params)) {
+                summaryEl.textContent = 'Please add at least one filter to preview a summary.';
+                return;
+            }
+            const response = await fetch(`/summary?${params.toString()}`);
+            if (!response.ok) {
+                summaryEl.textContent = 'Failed to load summary. Please check your filters.';
+                return;
+            }
+            const data = await response.json();
+            summaryEl.textContent = JSON.stringify(data, null, 2);
+        });
+
+        loadFilters();
+    </script>
+</body>
+</html>

@@ -51,6 +51,20 @@ issues = run_basic_qa(records)
 
 Use these helpers in dashboards to drive charts and tables (for example totals by utility or month, top spills, and QA issue counts) rather than duplicating query logic.
 
+### Web UI & HTTP API (Module F)
+
+A lightweight FastAPI layer is available for quick filtered downloads and previews built on the same client and schema used by the CLI.
+
+- **Run locally:** `uvicorn webapp.api:app --reload`
+- **Endpoints:**
+  - `/` – minimal HTML UI with dropdowns for utility/county and date range inputs
+  - `/download` – CSV download for the selected filters
+  - `/summary` – brief JSON volume summary (uses `sso_analytics` helpers)
+  - `/filters` – metadata for populating UI dropdowns
+- **Config:** honors the same `SSO_API_BASE_URL`, `SSO_API_KEY`, and `SSO_API_TIMEOUT` env vars used by the CLI.
+
+This module is intended as a thin shell that future dashboards (Module G) can extend without re-implementing query or CSV logic.
+
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 
 ## Repository layout and entry points

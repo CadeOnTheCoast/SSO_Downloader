@@ -2,8 +2,13 @@
 """Automated SSO PDF downloader and parser.
 
 This script scrapes Alabama's ADEM eFile site for all Sanitary Sewer Overflow
-(SSO) reports filed in 2024, downloads the PDF documents, extracts key fields
-and writes the results to ``sso_reports_2024.csv``.
+(SSO) reports for a given YEAR, downloads the PDF documents, extracts key fields,
+and writes the results to ``sso_reports_<YEAR>.csv``.
+
+Usage:
+  python script.py                # defaults to YEAR=2023
+  SSO_YEAR=2024 python script.py  # override via env var
+  python script.py 2024           # override via CLI arg
 """
 
 import json
@@ -25,13 +30,19 @@ import pytesseract
 from playwright.sync_api import sync_playwright
 import requests
 
+# ===== Year configuration =====
+DEFAULT_YEAR = 2023
+YEAR = int(os.getenv("SSO_YEAR", str(DEFAULT_YEAR)))
+if len(sys.argv) >= 2 and sys.argv[1].isdigit():
+    YEAR = int(sys.argv[1])
+
 # Constants
 BASE_URL = "https://app.adem.alabama.gov/eFile/Default.aspx"
-START_DATE = "01/01/2024"
-END_DATE = "12/31/2024"
-DOWNLOAD_DIR = "/Users/cade/SSOs"
-LINKS_JSON = "links.json"
-CSV_OUTPUT = "/Users/cade/SSOs/sso_reports_2024.csv"
+START_DATE = f"01/01/{YEAR}"
+END_DATE = f"12/31/{YEAR}"
+DOWNLOAD_DIR = f"/Users/cade/SSOs/{YEAR}"
+LINKS_JSON = f"links_{YEAR}.json"
+CSV_OUTPUT = f"/Users/cade/SSOs/sso_reports_{YEAR}.csv"
 PAGE_LIMIT: int | None = None  # set to an int to stop after N pages; None means no limit
 
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
@@ -51,15 +62,14 @@ class DocLink:
 
 
 def scrape_links() -> List[DocLink]:
-    """Use Playwright to collect PDF links for 2024 SSO reports."""
-    logging.info("Scraping document links from eFile")
+    """Use Playwright to collect PDF links for YEAR SSO reports."""
+    logging.info("Scraping document links from eFile for YEAR=%s (%s–%s)", YEAR, START_DATE, END_DATE)
     links: List[DocLink] = []
 
     def sanitize_filename(name: str) -> str:
         return re.sub(r"[^\w\-\. ]", "", name).replace(" ", "")
 
     with sync_playwright() as pw:
-        import sys
         DEV_MODE = "--show" in sys.argv
         browser = pw.chromium.launch(headless=not DEV_MODE, slow_mo=250 if DEV_MODE else 0)
         page = browser.new_page()
@@ -82,52 +92,43 @@ def scrape_links() -> List[DocLink]:
         """)
         time.sleep(1)
 
-        # Step 4: Click the "Custom Query" checkbox
+        # Custom Query
         page.evaluate("""
             document.getElementById("ctl00_ContentPlaceHolder1_CheckBoxCustomQuery").click();
         """)
-        time.sleep(2)  # allow time for postback
+        time.sleep(2)
 
-        # Step 5: Select "SSO" in the ListBoxTypes
+        # Select "SSO" type and "Water" media
         page.select_option("#ctl00_ContentPlaceHolder1_ListBoxTypes", value="SSO")
         time.sleep(0.5)
-
-        # Step 5.5: Check the "Water" media area checkbox
         page.check("#ctl00_ContentPlaceHolder1_LibraryCheckBoxList_2")
         time.sleep(0.5)
 
-        # Step 6: Click the "Add Type" button
+        # Add Type and Search
         page.click("#ctl00_ContentPlaceHolder1_ButtonAddType")
         time.sleep(1)
-
-        # Step 7: Click the "Search" button
         page.click("#ctl00_ContentPlaceHolder1_SearchButton")
-        time.sleep(5)  # wait for results to load
-
+        time.sleep(5)
         page.wait_for_selector("table#ctl00_ContentPlaceHolder1_DocsGridView")
 
         page_num = 1
-        # Maintain a dict to track counts per facility-date for unique filenames
         filename_counters = {}
 
         while True:
             logging.info("Reading result page %s", page_num)
-            rows = page.query_selector_all(
-                "table#ctl00_ContentPlaceHolder1_DocsGridView tbody tr")[2:]
+            rows = page.query_selector_all("table#ctl00_ContentPlaceHolder1_DocsGridView tbody tr")[2:]
             if not rows:
                 break
             for row in rows:
                 cells = row.query_selector_all("td")
                 if len(cells) < 2:
-                    continue  # skip malformed rows
+                    continue
 
                 link_el = cells[0].query_selector("a")
                 if not link_el:
                     continue
-                # DEBUG: log raw hrefs coming from the table
+
                 raw_href = link_el.get_attribute("href")
-                print(f"[DEBUG] raw href on page {page_num}: {raw_href[:120] if raw_href else 'None'}")
-                # Skip pager rows or any link that is not a direct DocView URL
                 if (raw_href is None) or raw_href.lower().startswith("javascript:"):
                     continue
 
@@ -144,59 +145,38 @@ def scrape_links() -> List[DocLink]:
                 facility_safe = sanitize_filename(facility_raw)
                 date_safe = date_raw.replace("/", "-")
 
-                # Create unique filename with counter for multiple SSOs same day and facility
+                # Unique filename per (facility, date)
                 key = (facility_safe, date_safe)
                 count = filename_counters.get(key, 0)
                 base_file_name = f"{facility_safe}_{date_safe}_SSO"
-                if count > 0:
-                    file_name = f"{base_file_name}_{count}.pdf"
-                else:
-                    file_name = f"{base_file_name}.pdf"
-
-                # Increment counter until file does not exist
+                file_name = f"{base_file_name}.pdf" if count == 0 else f"{base_file_name}_{count}.pdf"
                 while os.path.exists(os.path.join(DOWNLOAD_DIR, file_name)):
                     count += 1
                     file_name = f"{base_file_name}_{count}.pdf"
                 filename_counters[key] = count + 1
 
-                # Only read the <a> element’s href, do not click or expect download
                 href = link_el.get_attribute("href") or ""
                 if href and not href.lower().startswith("http"):
                     href = "https://app.adem.alabama.gov/eFile/" + href.lstrip("/")
                 links.append(DocLink(href, file_name, metadata))
 
-            # always scroll to the bottom so the pager is in view
+            # pagination
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(0.5)  # let the pager render
-            # ---- pagination ----
+            time.sleep(0.5)
             next_page_num = page_num + 1
-            clicked = False
 
-            # 1) explicit numbered link by href, e.g. ...Page$2
-            link_selector = f"a[href*='Page${next_page_num}']"
-            num_link = page.query_selector(link_selector)
-
-            # 2) if the numbered link is not an <a> (because the current page is wrapped
-            #    in <span>) we try the visible‑text variant.
-            if not num_link:
-                num_link = page.query_selector(f"a:has-text('{next_page_num}')")
-
-            # 3) finally try the “Next >” link.
-            if not num_link and page.query_selector("a:has-text('Next >')"):
-                num_link = page.query_selector("a:has-text('Next >')")
+            num_link = page.query_selector(f"a[href*='Page${next_page_num}']") or \
+                       page.query_selector(f"a:has-text('{next_page_num}')") or \
+                       page.query_selector("a:has-text('Next >')")
 
             if num_link and num_link.is_enabled():
                 num_link.click(force=True)
-                # wait for the next page of results to appear (first data row)
-                page.wait_for_selector("table#ctl00_ContentPlaceHolder1_DocsGridView tbody tr:nth-child(3)",
-                                        timeout=30000)
+                page.wait_for_selector("table#ctl00_ContentPlaceHolder1_DocsGridView tbody tr:nth-child(3)", timeout=30000)
                 page_num += 1
                 if PAGE_LIMIT and page_num > PAGE_LIMIT:
                     logging.info("Reached PAGE_LIMIT=%s, stopping.", PAGE_LIMIT)
                     break
-                continue
             else:
-                # logging.info("Reached PAGE_LIMIT=%s, stopping.", PAGE_LIMIT)
                 if PAGE_LIMIT and page_num >= PAGE_LIMIT:
                     logging.info("Reached PAGE_LIMIT=%s, stopping.", PAGE_LIMIT)
                 logging.info("No further pages found after page %s", page_num)
@@ -212,7 +192,6 @@ def scrape_links() -> List[DocLink]:
 
 def download_pdfs(links: List[DocLink], limit: int = None) -> None:
     """Download each PDF to ``DOWNLOAD_DIR`` using Playwright."""
-    import sys
     with sync_playwright() as pw:
         DEV_MODE = "--show" in sys.argv
         browser = pw.chromium.launch(headless=not DEV_MODE, slow_mo=250 if DEV_MODE else 0)
@@ -222,7 +201,6 @@ def download_pdfs(links: List[DocLink], limit: int = None) -> None:
         for link in links:
             if limit is not None and count >= limit:
                 break
-            # skip javascript: links
             if link.url.lower().startswith("javascript:"):
                 continue
             dest = os.path.join(DOWNLOAD_DIR, link.file_name)
@@ -231,7 +209,6 @@ def download_pdfs(links: List[DocLink], limit: int = None) -> None:
             logging.info("Downloading %s", dest)
             try:
                 page.goto(link.url, timeout=60000)
-                # Wait for the download button to be visible
                 page.wait_for_selector("#STR_DOWNLOAD", timeout=30000, state="visible")
                 with page.expect_download() as download_info:
                     page.click("#STR_DOWNLOAD")
@@ -277,7 +254,6 @@ def parse_pdf_text(text: str) -> Dict[str, str]:
             m = re.search(regex["volume"], text, flags=re.IGNORECASE | re.DOTALL)
             if m:
                 vol_str = m.group(1).strip()
-                # If volume string contains range indicators, set to 9999
                 if '<' in vol_str or 'to' in vol_str.lower():
                     data["volume"] = "9999"
                 else:
@@ -294,47 +270,32 @@ def parse_pdf_text(text: str) -> Dict[str, str]:
             m = re.search(pat, text, flags=re.IGNORECASE | re.DOTALL)
             data[key] = m.group(1).strip() if m else None
 
-    # Parse start and stop datetime from the "SSO Event - Information" section
-    # Locate the section first
+    # SSO Event section
     sso_info_match = re.search(r"SSO Event - Information\s*(.*?)\n\n", text, flags=re.IGNORECASE | re.DOTALL)
     sso_section = sso_info_match.group(1) if sso_info_match else text
 
-    # Extract start date/time
     start_match = re.search(
         r"Date/Time SSO Event Started:\s*Date Time\s*([\d/]+)\s*([\d:]+\s*[apmAPM]{2})",
-        sso_section,
-        flags=re.IGNORECASE,
+        sso_section, flags=re.IGNORECASE,
     )
     if start_match:
         data["start"] = f"{start_match.group(1)} {start_match.group(2)}"
-        data["start_date"] = start_match.group(1)
-        data["start_time"] = start_match.group(2)
     else:
         data["start"] = None
-        data["start_date"] = None
-        data["start_time"] = None
 
-    # Extract stop date/time
     stop_match = re.search(
         r"Date/Time SSO Event Stopped:\s*Date Time\s*([\d/]+)\s*([\d:]+\s*[apmAPM]{2})",
-        sso_section,
-        flags=re.IGNORECASE,
+        sso_section, flags=re.IGNORECASE,
     )
     if stop_match:
         data["stop"] = f"{stop_match.group(1)} {stop_match.group(2)}"
-        data["stop_date"] = stop_match.group(1)
-        data["stop_time"] = stop_match.group(2)
     else:
         data["stop"] = None
-        data["stop_date"] = None
-        data["stop_time"] = None
 
-    # Clean up address parsing: extract address block and parse components
-    # Adjust regex to allow multiline and irregular spacing between fields
+    # Address block fallback logic remains as in your original
     address_block_match = re.search(
         r"Street Address\s*\n*\s*(.+?)\s*\n*\s*City\s*\n*\s*(.+?),\s*\n*\s*State\s*\n*\s*([A-Z]{2})\s*\n*\s*ZIP Code\s*\n*\s*(\d+)\s*\n*\s*Location Description\s*\n*\s*(.+?)\s*\n*\s*Known or suspected cause",
-        text,
-        flags=re.IGNORECASE | re.DOTALL,
+        text, flags=re.IGNORECASE | re.DOTALL,
     )
     if address_block_match:
         data["address"] = address_block_match.group(1).strip()
@@ -343,7 +304,6 @@ def parse_pdf_text(text: str) -> Dict[str, str]:
         data["zip"] = address_block_match.group(4).strip()
         data["location_desc"] = address_block_match.group(5).strip()
     else:
-        # fallback to individual regex if block not found
         if not data.get("address"):
             addr_m = re.search(r"Street Address\s+(.+?)\s+City", text, flags=re.IGNORECASE | re.DOTALL)
             if addr_m:
@@ -361,10 +321,6 @@ def parse_pdf_text(text: str) -> Dict[str, str]:
             if loc_m:
                 data["location_desc"] = loc_m.group(1).strip()
 
-    # Remove old keys no longer needed
-    for old_key in ["start_date", "start_time", "stop_date", "stop_time"]:
-        data.pop(old_key, None)
-
     return data
 
 
@@ -373,7 +329,6 @@ def parse_pdfs(input_dir: str = DOWNLOAD_DIR) -> None:
     records = []
     processed_files = set()
 
-    # Skip parsing if output CSV already has data
     if os.path.exists(CSV_OUTPUT):
         try:
             existing_df = pd.read_csv(CSV_OUTPUT)
@@ -381,10 +336,7 @@ def parse_pdfs(input_dir: str = DOWNLOAD_DIR) -> None:
         except Exception:
             pass
 
-    pdf_files = sorted(
-        f for f in os.listdir(input_dir)
-        if f.lower().endswith(".pdf") and not f.startswith(".")
-    )
+    pdf_files = sorted(f for f in os.listdir(input_dir) if f.lower().endswith(".pdf") and not f.startswith("."))
 
     for pdf_name in pdf_files:
         if pdf_name in processed_files:
@@ -401,11 +353,12 @@ def parse_pdfs(input_dir: str = DOWNLOAD_DIR) -> None:
                         text += page.extract_text(layout=True) or ""
                     except Exception as e:
                         logging.warning("Text extraction error in %s: %s", pdf_name, e)
-        except Exception as e:
+        except Exception:
             try:
                 images = convert_from_path(path)
                 if images:
-                    text = pytesseract.image_to_string(images[0])
+                    page_texts = [pytesseract.image_to_string(img) for img in images]
+                    text = "\n".join(page_texts)
             except Exception as ex:
                 logging.warning("OCR failed on %s: %s", pdf_name, ex)
                 continue
@@ -430,5 +383,5 @@ if __name__ == "__main__":
     ensure_dirs()
     links = scrape_links()
     download_pdfs(links)        # download all found PDFs
-    # parse_pdfs("/Users/cade/SSOs")
+    # parse_pdfs(DOWNLOAD_DIR)  # enable if you want CSV generation in the same run
     logging.info("Done")

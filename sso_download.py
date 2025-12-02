@@ -6,6 +6,9 @@ import sys
 from datetime import datetime
 from typing import Iterable
 
+from sso_analytics import QAIssue, run_basic_qa, summarize_overall_volume, summarize_volume_by_utility
+from sso_schema import normalize_sso_records
+
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv
 from sso_schema import SSOQuery
@@ -41,6 +44,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow running without any filters (may request a large dataset)",
     )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a brief volume summary after download",
+    )
+    parser.add_argument(
+        "--qa-report",
+        action="store_true",
+        help="Run basic QA checks and print findings",
+    )
     return parser
 
 
@@ -69,6 +82,49 @@ def _summarize(records: Iterable[dict], output_path: str, limit: int | None) -> 
         message_parts.append("(truncated by --limit)")
     message_parts.append(f"Saved to {output_path}")
     print(" ".join(message_parts))
+
+
+def _print_summary(records_norm):
+    overall = summarize_overall_volume(records_norm)
+    print("=== Volume summary ===")
+    print(
+        f"Total records with volume: {overall.count}\n"
+        f"Total volume (gallons): {overall.total_volume_gallons}\n"
+        f"Mean volume (gallons): {overall.mean_volume_gallons}\n"
+        f"Median volume (gallons): {overall.median_volume_gallons}\n"
+        f"Max volume (gallons): {overall.max_volume_gallons}"
+    )
+
+    by_utility = summarize_volume_by_utility(records_norm)[:5]
+    if by_utility:
+        print("Top utilities by total volume:")
+        for summary in by_utility:
+            print(f"- {summary.group_key}: {summary.total_volume_gallons} gallons across {summary.count} spills")
+
+
+def _print_qa_report(records_norm):
+    issues = run_basic_qa(records_norm)
+    if not issues:
+        print("No QA issues detected.")
+        return
+
+    print("=== QA report ===")
+    severity_counts: dict[str, int] = {}
+    for issue in issues:
+        severity_counts[issue.severity] = severity_counts.get(issue.severity, 0) + 1
+    for severity, count in sorted(severity_counts.items(), reverse=True):
+        print(f"{severity.title()}: {count}")
+
+    issues_by_code: dict[str, list[QAIssue]] = {}
+    for issue in issues:
+        issues_by_code.setdefault(issue.code, []).append(issue)
+
+    for code, code_issues in sorted(issues_by_code.items()):
+        preview = code_issues[:3]
+        print(f"- {code}: {len(code_issues)} occurrences")
+        for issue in preview:
+            sso_part = f" (SSO ID {issue.sso_id})" if issue.sso_id else ""
+            print(f"    {issue.message}{sso_part}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -106,8 +162,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if not records:
         print("No records returned for the given filters.")
+        return 0
+
+    records_norm = normalize_sso_records(records)
     write_ssos_to_csv(records, args.output)
     _summarize(records, args.output, args.limit)
+    if args.summary:
+        _print_summary(records_norm)
+    if args.qa_report:
+        _print_qa_report(records_norm)
     return 0
 
 

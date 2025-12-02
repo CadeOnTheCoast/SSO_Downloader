@@ -8,18 +8,18 @@ from typing import Iterable
 
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv
+from sso_schema import SSOQuery
 
 
-def _parse_date(value: str | None) -> str | None:
+def _parse_date(value: str | None):
     if value is None:
         return None
     try:
-        datetime.strptime(value, "%Y-%m-%d")
+        return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise argparse.ArgumentTypeError(
             f"Invalid date '{value}'. Expected format YYYY-MM-DD."
         ) from exc
-    return value
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -30,6 +30,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--county", help="Filter by county (if available)")
     parser.add_argument("--start-date", type=_parse_date, help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=_parse_date, help="End date (YYYY-MM-DD)")
+    parser.add_argument("--min-volume", type=float, help="Minimum spill volume (gallons)")
+    parser.add_argument("--max-volume", type=float, help="Maximum spill volume (gallons)")
     parser.add_argument("--limit", type=int, help="Maximum number of records to fetch")
     parser.add_argument("--base-url", help="Override the ArcGIS base URL")
     parser.add_argument("--api-key", help="API token for the ArcGIS service, if required")
@@ -44,7 +46,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def _ensure_filters_present(args: argparse.Namespace) -> None:
     has_filter = any(
-        [args.utility_id, args.utility_name, args.county, args.start_date, args.end_date]
+        [
+            args.utility_id,
+            args.utility_name,
+            args.county,
+            args.start_date,
+            args.end_date,
+            args.min_volume,
+            args.max_volume,
+        ]
     )
     if not has_filter and not args.allow_no_filters:
         raise SystemExit(
@@ -67,15 +77,27 @@ def main(argv: list[str] | None = None) -> int:
 
     _ensure_filters_present(args)
 
+    query = SSOQuery(
+        utility_id=args.utility_id,
+        utility_name=args.utility_name,
+        county=args.county,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        min_volume_gallons=args.min_volume,
+        max_volume_gallons=args.max_volume,
+    )
+
+    try:
+        query.validate()
+    except ValueError as exc:
+        print(f"Invalid filters: {exc}", file=sys.stderr)
+        return 2
+
     client = SSOClient(base_url=args.base_url, api_key=args.api_key, timeout=args.timeout)
 
     try:
         records = client.fetch_ssos(
-            utility_id=args.utility_id,
-            utility_name=args.utility_name,
-            county=args.county,
-            start_date=args.start_date,
-            end_date=args.end_date,
+            query=query,
             limit=args.limit,
         )
     except SSOClientError as exc:

@@ -10,6 +10,7 @@ The repository now includes a reusable client and CLI that query ADEM's ArcGIS R
 - **Client:** `sso_client.py` exposes `SSOClient.fetch_ssos` with filters for permit/utility, date range, volume bounds, and optional county. The client handles ArcGIS pagination and flattens geometry (`x`, `y`) onto each record.
 - **CSV export:** `sso_export.py` writes the fetched records to CSV (supports `.gz` output).
 - **CLI:** `sso_download.py` uses the client and exporter to pull data from the ArcGIS API.
+- **Analytics and QA:** `sso_analytics.py` computes reusable summaries (totals by utility, county, or month), top-N helpers, and basic QA checks for missing fields or odd volume text. These helpers operate on normalized `SSORecord` objects from `sso_schema.py` and can be used by the CLI or future dashboards.
 
 Configuration:
 
@@ -28,7 +29,27 @@ python sso_download.py --start-date 2024-01-01 --end-date 2024-12-31 --output da
 
 # Filter by volume range in gallons
 python sso_download.py --start-date 2024-01-01 --end-date 2024-12-31 --min-volume 10000 --output data/large_ssos_2024.csv
+
+# Print a quick volume summary and QA report after download
+python sso_download.py --utility-id AL0046744 --start-date 2024-01-01 --end-date 2024-12-31 --output data/ssos_2024.csv --summary --qa-report
 ```
+
+### Analytics and QA module
+
+The `sso_analytics` module is a lightweight analytics layer over normalized `SSORecord` instances. It provides volume summaries, groupings, and QA checks that future dashboards can consume instead of re-implementing aggregation logic.
+
+Minimal example:
+
+```python
+from sso_analytics import summarize_overall_volume, run_basic_qa
+from sso_schema import normalize_sso_records
+
+records = normalize_sso_records(raw_records)
+volume_summary = summarize_overall_volume(records)
+issues = run_basic_qa(records)
+```
+
+Use these helpers in dashboards to drive charts and tables (for example totals by utility or month, top spills, and QA issue counts) rather than duplicating query logic.
 
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 

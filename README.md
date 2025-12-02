@@ -65,6 +65,27 @@ A lightweight FastAPI layer is available for quick filtered downloads and previe
 
 This module is intended as a thin shell that future dashboards (Module G) can extend without re-implementing query or CSV logic.
 
+### Interactive dashboard (Module G)
+
+Module G layers a human-friendly dashboard on top of the existing FastAPI app and analytics helpers.
+
+- **Run locally:** `uvicorn webapp.api:app --reload` and open `http://127.0.0.1:8000/dashboard`.
+- **Features:**
+  - Filters for utility, county, and date range (with optional record limit).
+  - Summary cards for total spills and volume statistics.
+  - Charts for spills over time and volume by utility (Chart.js via CDN).
+  - Tabular record view with the same filters applied.
+  - CSV download button that reuses the `/download` endpoint.
+- **Dashboard API endpoints:**
+  - `/filters` – utility and county options for form controls.
+  - `/summary` – overall volume metrics and top utilities.
+  - `/series/by_date` – time series JSON for charts (`points` with date, count, total_volume_gallons).
+  - `/series/by_utility` – grouped bar data by utility (`bars` with label, count, total_volume_gallons).
+  - `/records` – normalized record list for the table view.
+  - `/download` – CSV export for the current filters.
+
+Module G is UI-only: it reuses Modules A–F for querying, normalization, CSV export, and analytics without adding new data sources.
+
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 
 ## Repository layout and entry points

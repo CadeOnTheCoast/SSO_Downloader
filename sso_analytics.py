@@ -34,6 +34,13 @@ class SpillRecordSummary:
     description: Optional[str]
 
 
+@dataclass
+class DateSeriesPoint:
+    date: str
+    count: int
+    total_volume_gallons: float
+
+
 IssueSeverity = Literal["info", "warning", "error"]
 
 
@@ -131,6 +138,32 @@ def summarize_volume_by_month(records: Iterable[SSORecord]) -> List[GroupVolumeS
         key = record.date_sso_began.strftime("%Y-%m")
         groups.setdefault(key, []).append(volume)
     return _summaries_from_groups(groups)
+
+
+def time_series_by_date(records: Iterable[SSORecord]) -> List[DateSeriesPoint]:
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for record in records:
+        if not record.date_sso_began:
+            continue
+        key = record.date_sso_began.strftime("%Y-%m-%d")
+        bucket = buckets.setdefault(key, {"count": 0, "volumes": []})
+        bucket["count"] += 1
+        volume = _usable_volume(record)
+        if volume is not None:
+            bucket["volumes"].append(volume)
+
+    points: List[DateSeriesPoint] = []
+    for key in sorted(buckets.keys()):
+        volumes = buckets[key]["volumes"]
+        total_volume = float(sum(volumes)) if volumes else 0.0
+        points.append(
+            DateSeriesPoint(
+                date=key,
+                count=buckets[key]["count"],
+                total_volume_gallons=total_volume,
+            )
+        )
+    return points
 
 
 def _detect_volume_range_text(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:

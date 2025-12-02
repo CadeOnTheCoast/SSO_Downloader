@@ -3,17 +3,21 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import requests
 
-DEFAULT_BASE_URL = "https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query"
+from sso_schema import (
+    COUNTY_FIELD,
+    END_DATE_FIELD,
+    START_DATE_FIELD,
+    UTILITY_ID_FIELD,
+    UTILITY_NAME_FIELD,
+    SSOQuery,
+)
 
-UTILITY_ID_FIELD = "permit_no"
-UTILITY_NAME_FIELD = "permittee"
-COUNTY_FIELD = "county"
-START_DATE_FIELD = "date_sso_began"
-END_DATE_FIELD = "date_sso_stopped"
+DEFAULT_BASE_URL = "https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query"
 DEFAULT_PAGE_SIZE = 2000
 
 
@@ -52,6 +56,7 @@ class SSOClient:
 
     def fetch_ssos(
         self,
+        query: SSOQuery | None = None,
         utility_id: str | None = None,
         utility_name: str | None = None,
         county: str | None = None,
@@ -61,20 +66,22 @@ class SSOClient:
         extra_params: dict | None = None,
     ) -> list[dict]:
         params: Dict[str, Any] = {
-            "where": self._build_where_clause(
-                utility_id=utility_id,
-                utility_name=utility_name,
-                county=county,
-                start_date=start_date,
-                end_date=end_date,
-            ),
             "outFields": "*",
-            "orderByFields": START_DATE_FIELD,
             "f": "json",
         }
+
+        query_obj = query or self._build_query(
+            utility_id=utility_id,
+            utility_name=utility_name,
+            county=county,
+            start_date=start_date,
+            end_date=end_date,
+            extra_params=extra_params,
+        )
+        params.update(query_obj.to_query_params())
         if self.api_key:
             params["token"] = self.api_key
-        if extra_params:
+        if extra_params and not query_obj.extra_params:
             params.update(extra_params)
 
         offset = 0
@@ -120,27 +127,35 @@ class SSOClient:
         start_date: str | None,
         end_date: str | None,
     ) -> str:
-        where_parts: List[str] = ["1=1"]
+        query_obj = self._build_query(
+            utility_id=utility_id,
+            utility_name=utility_name,
+            county=county,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return query_obj.build_where_clause()
 
-        if start_date and end_date:
-            where_parts.append(
-                f"{START_DATE_FIELD} >= DATE '{start_date} 00:00:00' AND {START_DATE_FIELD} < DATE '{end_date} 00:00:00'"
-            )
-        elif start_date:
-            where_parts.append(f"{START_DATE_FIELD} >= DATE '{start_date} 00:00:00'")
-        elif end_date:
-            where_parts.append(f"{START_DATE_FIELD} < DATE '{end_date} 00:00:00'")
-
-        if county:
-            safe_county = county.replace("'", "''")
-            where_parts.append(f"{COUNTY_FIELD} = '{safe_county}'")
-
-        if utility_id:
-            safe_id = utility_id.replace("'", "''")
-            where_parts.append(f"{UTILITY_ID_FIELD} = '{safe_id}'")
-
-        if utility_name:
-            safe_name = utility_name.replace("'", "''")
-            where_parts.append(f"{UTILITY_NAME_FIELD} = '{safe_name}'")
-
-        return " AND ".join(where_parts)
+    def _build_query(
+        self,
+        utility_id: str | None,
+        utility_name: str | None,
+        county: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        extra_params: dict | None = None,
+    ) -> SSOQuery:
+        start = None
+        end = None
+        if start_date:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        if end_date:
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        return SSOQuery(
+            utility_id=utility_id,
+            utility_name=utility_name,
+            county=county,
+            start_date=start,
+            end_date=end,
+            extra_params=extra_params,
+        )

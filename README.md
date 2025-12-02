@@ -6,7 +6,8 @@ Scrape SSO reports from ADEM's eFile portal for a date range, download the PDFs,
 
 The repository now includes a reusable client and CLI that query ADEM's ArcGIS REST layer for SSO reports and export them directly to CSV. This path is intended to replace the ad hoc year-based scripts over time and can be reused by future web UIs or dashboards.
 
-- **Client:** `sso_client.py` exposes `SSOClient.fetch_ssos` with filters for permit/utility, date range, and optional county. The client handles ArcGIS pagination and flattens geometry (`x`, `y`) onto each record.
+- **Schema and filters:** `sso_schema.py` defines the canonical `SSORecord` shape plus the reusable `SSOQuery` filter model (shared by the CLI and future UI/dashboard code). See `docs/schema_and_filters.md` for details.
+- **Client:** `sso_client.py` exposes `SSOClient.fetch_ssos` with filters for permit/utility, date range, volume bounds, and optional county. The client handles ArcGIS pagination and flattens geometry (`x`, `y`) onto each record.
 - **CSV export:** `sso_export.py` writes the fetched records to CSV (supports `.gz` output).
 - **CLI:** `sso_download.py` uses the client and exporter to pull data from the ArcGIS API.
 
@@ -24,6 +25,9 @@ python sso_download.py --utility-id AL0046744 --start-date 2024-01-01 --end-date
 
 # Download with only a date range (requires --allow-no-filters)
 python sso_download.py --start-date 2024-01-01 --end-date 2024-12-31 --output data/ssos_all_2024.csv --allow-no-filters
+
+# Filter by volume range in gallons
+python sso_download.py --start-date 2024-01-01 --end-date 2024-12-31 --min-volume 10000 --output data/large_ssos_2024.csv
 ```
 
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.

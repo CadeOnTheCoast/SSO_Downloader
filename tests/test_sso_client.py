@@ -10,6 +10,7 @@ from sso_client import (
     UTILITY_ID_FIELD,
     UTILITY_NAME_FIELD,
 )
+from sso_schema import SSOQuery
 
 
 class DummyResponse:
@@ -50,7 +51,7 @@ def test_build_where_clause():
         end_date="2024-02-01",
     )
 
-    assert START_DATE_FIELD in where
+    assert "2024-02-02" in where
     assert f"{UTILITY_ID_FIELD} = 'AL123''45'" in where
     assert f"{UTILITY_NAME_FIELD} = 'Utility'" in where
     assert f"{COUNTY_FIELD} = 'Mobile'" in where
@@ -96,3 +97,22 @@ def test_fetch_ssos_invalid_json():
 
     with pytest.raises(SSOClientError):
         client.fetch_ssos()
+
+
+def test_fetch_ssos_accepts_query_object():
+    responses = [
+        DummyResponse({
+            "features": [
+                {"attributes": {"id": 1}, "geometry": {"x": 1, "y": 2}},
+            ]
+        })
+    ]
+    session = MockSession(responses)
+    client = SSOClient(base_url="http://example.com", session=session)
+    query = SSOQuery(county="Mobile")
+
+    records = client.fetch_ssos(query=query, limit=1)
+
+    assert len(records) == 1
+    assert "where" in session.calls[0]["params"]
+    assert "county = 'Mobile'" in session.calls[0]["params"]["where"]

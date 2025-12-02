@@ -94,7 +94,7 @@ def test_download_requires_filters():
     assert "At least one filter" in response.json()["detail"]
 
 
-def test_summary_returns_overall_and_top_utilities():
+def test_dashboard_summary_returns_expected_payload():
     records = [
         {
             UTILITY_ID_FIELD: "AL1234567",
@@ -113,13 +113,13 @@ def test_summary_returns_overall_and_top_utilities():
     ]
     client = _set_client_override(records)
 
-    response = client.get("/summary", params={"utility_id": "AL1234567"})
+    response = client.get("/api/ssos/summary", params={"utility_id": "AL1234567"})
     _clear_overrides()
 
     assert response.status_code == 200
     payload = response.json()
-    assert "overall" in payload
-    assert payload["overall"]["count"] >= 2
-    assert "top_utilities" in payload
-    assert isinstance(payload["top_utilities"], list)
-    assert payload["top_utilities"]
+    assert payload["summary_counts"]["total_records"] == 2
+    assert payload["summary_counts"]["total_volume"] == 150.0
+    assert payload["by_month"]
+    assert payload["by_utility"]
+    assert payload["by_volume_bucket"]

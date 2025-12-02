@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from statistics import mean, median
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 from typing import Literal
 
 from sso_schema import SSORecord
@@ -42,6 +42,16 @@ class DateSeriesPoint:
 
 
 IssueSeverity = Literal["info", "warning", "error"]
+
+# Volume buckets are inclusive of the lower bound and exclusive of the upper
+# bound (except when the upper bound is ``None`` which means "and up").
+VOLUME_BUCKETS: List[tuple[float, Optional[float]]] = [
+    (0, 1000),
+    (1000, 10_000),
+    (10_000, 50_000),
+    (50_000, 100_000),
+    (100_000, None),
+]
 
 
 @dataclass
@@ -164,6 +174,197 @@ def time_series_by_date(records: Iterable[SSORecord]) -> List[DateSeriesPoint]:
             )
         )
     return points
+
+
+def _month_key(record: SSORecord) -> Optional[str]:
+    if not record.date_sso_began:
+        return None
+    return record.date_sso_began.strftime("%Y-%m")
+
+
+def summarize_by_month(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    """Aggregate spill counts and volumes by month (YYYY-MM).
+
+    Records without a ``date_sso_began`` are skipped because the month bucket
+    cannot be determined. ``total_volume`` sums valid, non-negative volume
+    values and ignores ``None`` or negative entries.
+    """
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for record in records:
+        month = _month_key(record)
+        if not month:
+            continue
+        bucket = buckets.setdefault(month, {"spill_count": 0, "volumes": []})
+        bucket["spill_count"] += 1
+        volume = _usable_volume(record)
+        if volume is not None:
+            bucket["volumes"].append(volume)
+
+    rows: List[Dict[str, Any]] = []
+    for month in sorted(buckets.keys()):
+        volumes = buckets[month]["volumes"]
+        total_volume = float(sum(volumes)) if volumes else 0.0
+        avg_volume = mean(volumes) if volumes else None
+        max_volume = max(volumes) if volumes else None
+        rows.append(
+            {
+                "month": month,
+                "spill_count": buckets[month]["spill_count"],
+                "total_volume": total_volume,
+                "avg_volume": avg_volume,
+                "max_volume": max_volume,
+            }
+        )
+    return rows
+
+
+def _utility_group_key(record: SSORecord) -> Optional[str]:
+    if record.utility_id:
+        return record.utility_id
+    if record.utility_name:
+        return record.utility_name
+    return None
+
+
+def summarize_by_utility(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    """Summarize spills grouped by utility id/name.
+
+    The grouping key prefers ``utility_id`` when available; otherwise it falls
+    back to ``utility_name``. Records missing both are ignored. Results are
+    sorted by ``total_volume`` descending and then by ``spill_count``.
+    """
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for record in records:
+        group_key = _utility_group_key(record)
+        if not group_key:
+            continue
+        bucket = buckets.setdefault(
+            group_key,
+            {
+                "utility_id": record.utility_id,
+                "utility_name": record.utility_name,
+                "spill_count": 0,
+                "volumes": [],
+            },
+        )
+        # Preserve a readable utility_name even when grouped by ID only
+        if not bucket.get("utility_name") and record.utility_name:
+            bucket["utility_name"] = record.utility_name
+
+        bucket["spill_count"] += 1
+        volume = _usable_volume(record)
+        if volume is not None:
+            bucket["volumes"].append(volume)
+
+    rows: List[Dict[str, Any]] = []
+    for key, data in buckets.items():
+        volumes = data["volumes"]
+        total_volume = float(sum(volumes)) if volumes else 0.0
+        avg_volume = mean(volumes) if volumes else None
+        max_volume = max(volumes) if volumes else None
+        rows.append(
+            {
+                "utility_id": data.get("utility_id"),
+                "utility_name": data.get("utility_name") or key,
+                "spill_count": data["spill_count"],
+                "total_volume": total_volume,
+                "avg_volume": avg_volume,
+                "max_volume": max_volume,
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            -row["total_volume"],
+            -row["spill_count"],
+            row.get("utility_name") or "",
+        )
+    )
+    return rows
+
+
+def _bucket_label(lower: float, upper: Optional[float]) -> str:
+    if upper is None:
+        return f">={lower:,.0f}"
+    return f"{lower:,.0f}–{upper:,.0f}"
+
+
+def summarize_by_volume_bucket(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    """Summarize spill counts and volumes grouped into size buckets.
+
+    Records with missing or negative volumes are assigned to an ``unknown``
+    bucket to avoid losing count information.
+    """
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for lower, upper in VOLUME_BUCKETS:
+        label = _bucket_label(lower, upper)
+        buckets[label] = {"spill_count": 0, "total_volume": 0.0}
+    buckets["unknown"] = {"spill_count": 0, "total_volume": 0.0}
+
+    for record in records:
+        volume = _usable_volume(record)
+        if volume is None:
+            buckets["unknown"]["spill_count"] += 1
+            continue
+
+        matched_label = None
+        for lower, upper in VOLUME_BUCKETS:
+            if upper is None:
+                if volume >= lower:
+                    matched_label = _bucket_label(lower, upper)
+                    break
+            elif lower <= volume < upper:
+                matched_label = _bucket_label(lower, upper)
+                break
+
+        if matched_label is None:
+            matched_label = "unknown"
+
+        buckets[matched_label]["spill_count"] += 1
+        buckets[matched_label]["total_volume"] += volume if volume is not None else 0.0
+
+    rows: List[Dict[str, Any]] = []
+    for lower, upper in VOLUME_BUCKETS:
+        label = _bucket_label(lower, upper)
+        rows.append({"bucket_label": label, **buckets[label]})
+    rows.append({"bucket_label": "unknown", **buckets["unknown"]})
+    return rows
+
+
+def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
+    """Build a single summary payload for the dashboard UI."""
+
+    volumes = [vol for vol in (_usable_volume(record) for record in records) if vol is not None]
+    total_volume = float(sum(volumes)) if volumes else 0.0
+    avg_volume = mean(volumes) if volumes else None
+    max_volume = max(volumes) if volumes else None
+
+    utilities = set()
+    for record in records:
+        key = _utility_group_key(record)
+        if key:
+            utilities.add(key)
+
+    date_values = [record.date_sso_began for record in records if record.date_sso_began]
+    date_min = min(date_values).date().isoformat() if date_values else None
+    date_max = max(date_values).date().isoformat() if date_values else None
+
+    return {
+        "summary_counts": {
+            "total_records": len(records),
+            "total_volume": total_volume,
+            "avg_volume": avg_volume,
+            "max_volume": max_volume,
+            "distinct_utilities": len(utilities),
+            "date_range": {"min": date_min, "max": date_max},
+        },
+        "by_month": summarize_by_month(records),
+        "by_utility": summarize_by_utility(records),
+        "by_volume_bucket": summarize_by_volume_bucket(records),
+    }
 
 
 def _detect_volume_range_text(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:

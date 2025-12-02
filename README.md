@@ -2,6 +2,32 @@
 
 Scrape SSO reports from ADEM's eFile portal for a date range, download the PDFs, and parse key fields into a CSV for analysis or QA/QC. Use it when you need a reproducible pull of ADEM SSO reports for a specific year or to re-parse an existing set of PDFs with consistent logic.
 
+## ArcGIS REST-based downloader (new)
+
+The repository now includes a reusable client and CLI that query ADEM's ArcGIS REST layer for SSO reports and export them directly to CSV. This path is intended to replace the ad hoc year-based scripts over time and can be reused by future web UIs or dashboards.
+
+- **Client:** `sso_client.py` exposes `SSOClient.fetch_ssos` with filters for permit/utility, date range, and optional county. The client handles ArcGIS pagination and flattens geometry (`x`, `y`) onto each record.
+- **CSV export:** `sso_export.py` writes the fetched records to CSV (supports `.gz` output).
+- **CLI:** `sso_download.py` uses the client and exporter to pull data from the ArcGIS API.
+
+Configuration:
+
+- `SSO_API_BASE_URL`: Override the ArcGIS query endpoint (defaults to `https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query`).
+- `SSO_API_KEY`: Token if the service ever requires one (not currently needed).
+- `SSO_API_TIMEOUT`: HTTP timeout in seconds (default `30`).
+
+Example CLI usage:
+
+```bash
+# Download SSOs for a permit/utility by date range
+python sso_download.py --utility-id AL0046744 --start-date 2024-01-01 --end-date 2024-12-31 --output data/ssos_2024.csv
+
+# Download with only a date range (requires --allow-no-filters)
+python sso_download.py --start-date 2024-01-01 --end-date 2024-12-31 --output data/ssos_all_2024.csv --allow-no-filters
+```
+
+The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
+
 ## Repository layout and entry points
 
 - **Scrape + download:** `SSODownloadOnly.py`

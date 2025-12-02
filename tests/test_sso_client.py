@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import pytest
+
+from sso_client import (
+    COUNTY_FIELD,
+    START_DATE_FIELD,
+    SSOClient,
+    SSOClientError,
+    UTILITY_ID_FIELD,
+    UTILITY_NAME_FIELD,
+)
+
+
+class DummyResponse:
+    def __init__(self, json_data, status_code=200, text="") -> None:
+        self._json_data = json_data
+        self.status_code = status_code
+        self.text = text or str(json_data)
+
+    @property
+    def ok(self) -> bool:
+        return 200 <= self.status_code < 300
+
+    def json(self):
+        if isinstance(self._json_data, Exception):
+            raise self._json_data
+        return self._json_data
+
+
+class MockSession:
+    def __init__(self, responses: list[DummyResponse]) -> None:
+        self.responses = responses
+        self.calls = []
+
+    def get(self, url, params=None, timeout=None):  # noqa: D401
+        self.calls.append({"url": url, "params": params, "timeout": timeout})
+        if not self.responses:
+            raise AssertionError("No mock responses left")
+        return self.responses.pop(0)
+
+
+def test_build_where_clause():
+    client = SSOClient(base_url="http://example.com")
+    where = client._build_where_clause(
+        utility_id="AL123'45",
+        utility_name="Utility",
+        county="Mobile",
+        start_date="2024-01-01",
+        end_date="2024-02-01",
+    )
+
+    assert START_DATE_FIELD in where
+    assert f"{UTILITY_ID_FIELD} = 'AL123''45'" in where
+    assert f"{UTILITY_NAME_FIELD} = 'Utility'" in where
+    assert f"{COUNTY_FIELD} = 'Mobile'" in where
+
+
+def test_fetch_ssos_paginates_and_applies_limit():
+    responses = [
+        DummyResponse({
+            "features": [
+                {"attributes": {"id": 1}, "geometry": {"x": 1, "y": 2}},
+                {"attributes": {"id": 2}, "geometry": {"x": 3, "y": 4}},
+            ]
+        }),
+        DummyResponse({
+            "features": [
+                {"attributes": {"id": 3}, "geometry": {"x": 5, "y": 6}},
+            ]
+        }),
+    ]
+    session = MockSession(responses)
+    client = SSOClient(base_url="http://example.com", session=session)
+
+    records = client.fetch_ssos(limit=2, extra_params={"resultRecordCount": 2})
+
+    assert len(records) == 2
+    assert records[0]["id"] == 1
+    assert session.calls[0]["params"]["resultOffset"] == 0
+    # Limit should stop further pagination once enough records are collected
+    assert len(session.calls) == 1
+
+
+def test_fetch_ssos_handles_http_error():
+    session = MockSession([DummyResponse({}, status_code=500, text="boom")])
+    client = SSOClient(base_url="http://example.com", session=session)
+
+    with pytest.raises(SSOClientError):
+        client.fetch_ssos()
+
+
+def test_fetch_ssos_invalid_json():
+    session = MockSession([DummyResponse(ValueError("bad json"))])
+    client = SSOClient(base_url="http://example.com", session=session)
+
+    with pytest.raises(SSOClientError):
+        client.fetch_ssos()

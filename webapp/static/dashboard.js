@@ -310,10 +310,9 @@
     tbody.innerHTML = '';
 
     const records = response.items || response.records || [];
-    const total = response.total || records.length;
     const limit = response.limit || records.length;
 
-    tableMeta.textContent = `Showing ${records.length} of ${total} records (limit ${limit})`;
+    tableMeta.textContent = `Showing ${records.length} records (limit ${limit})`;
 
     if (!records.length) {
       const row = document.createElement('tr');

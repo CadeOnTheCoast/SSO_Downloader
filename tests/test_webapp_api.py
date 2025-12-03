@@ -35,6 +35,18 @@ class DummyClient:
     def list_counties(self):  # pragma: no cover - simple stub
         return self.counties
 
+    def permittee_permit_map(self):  # pragma: no cover - simple stub
+        return {
+            item["name"].lower(): {"label": item["name"], "permits": [item["id"]]}
+            for item in self.utilities
+        }
+
+    def list_permittees(self):  # pragma: no cover - simple stub
+        return [
+            {"id": item["id"], "name": item["name"], "permits": [item["id"]]}
+            for item in self.utilities
+        ]
+
 
 def _set_client_override(records: List[dict]) -> TestClient:
     dummy = DummyClient(records)

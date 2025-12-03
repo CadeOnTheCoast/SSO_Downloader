@@ -97,6 +97,7 @@ Module I layers a human-friendly dashboard on top of the FastAPI app and analyti
 {
   "summary_counts": {
     "total_records": 123,
+    "total_spills": 123,
     "total_volume_gallons": 456789.0,
     "total_duration_hours": 12.5,
     "distinct_utilities": 8,
@@ -106,12 +107,16 @@ Module I layers a human-friendly dashboard on top of the FastAPI app and analyti
   "time_series": {"granularity": "month"|"year"|"none", "points": [...]},
   "top_utilities": [...],
   "top_utilities_pie": [...],
-  "top_receiving_waters": [...],
+  "top_receiving_waters": [
+    {"receiving_water": "Dog River", "spill_count": 2, "total_volume_gallons": 1500.0}
+  ],
   "receiving_waters_pie": [...]
 }
 ```
 
-Chart series and tables honor the requested filters. Pie slices are omitted when the user filters to a single utility or when total volume is zero.
+Chart series and tables honor the requested filters. Pie slices are omitted when the user filters to a single utility or when total volume is zero. Time-series points are only emitted for date spans of 60 days or longer, and the UI hides the charts for shorter windows.
+
+Utility filtering accepts full permittee names (e.g., "City of Fairhope") and an optional `permit` query parameter for power users who want to scope to a specific NPDES ID. County filtering uses the full Alabama county list and is available as a search-as-you-type field in the UI.
 
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 

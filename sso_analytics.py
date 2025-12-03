@@ -72,6 +72,14 @@ def _usable_volume(record: SSORecord) -> Optional[float]:
 
 
 def _best_volume(record: SSORecord) -> Optional[float]:
+    est_high = getattr(record, "est_volume_high", None)
+    if est_high is None and hasattr(record, "raw"):
+        est_high = record.raw.get("est_volume_high")
+    if est_high is not None:
+        try:
+            return float(est_high)
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            pass
     if record.est_volume_gal is not None:
         try:
             return float(record.est_volume_gal)
@@ -438,7 +446,12 @@ def summarize_top_receiving_waters(records: Sequence[SSORecord]) -> List[Dict[st
             continue
         bucket = buckets.setdefault(
             name,
-            {"receiving_water_name": name, "spill_count": 0, "total_volume_gallons": 0.0},
+            {
+                "receiving_water": name,
+                "receiving_water_name": name,
+                "spill_count": 0,
+                "total_volume_gallons": 0.0,
+            },
         )
         bucket["spill_count"] += 1
         volume = _best_volume(record)
@@ -509,6 +522,7 @@ def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "summary_counts": {
             "total_records": len(records),
+            "total_spills": len(records),
             "total_volume_gallons": total_volume,
             "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
             "avg_volume": avg_volume,

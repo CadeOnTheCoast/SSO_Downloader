@@ -31,8 +31,8 @@
         .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
         .card { background: var(--panel); padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .card-title { color: var(--muted); font-size: 0.85rem; }
-        .card-value { font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem; }
-        .card-sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+        .card-body { margin-top: 0.35rem; line-height: 1.45; }
+        .card-sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
         .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
         .chart-empty { color: var(--muted); font-style: italic; text-align: center; padding: 1.25rem 0.5rem; }
         .section-title { font-size: 1.05rem; margin: 1rem 0 0.5rem; font-weight: 800; }
@@ -68,6 +68,11 @@
                     <button class="clear-btn" type="button" data-target="utility-search" aria-label="Clear utility">×</button>
                 </div>
                 <div class="searchable">
+                    <label for="permit-search">Permit number (optional)</label>
+                    <input id="permit-search" type="text" placeholder="Type a permit (e.g., AL0027561)" />
+                    <button class="clear-btn" type="button" data-target="permit-search" aria-label="Clear permit">×</button>
+                </div>
+                <div class="searchable">
                     <label for="county-search">County</label>
                     <input id="county-search" type="text" list="county-options" placeholder="Search counties" />
                     <datalist id="county-options"></datalist>
@@ -88,19 +93,18 @@
                 <div id="dashboard" class="hidden" aria-live="polite">
                     <div class="cards">
                         <div class="card">
-                            <div class="card-title">Total spills</div>
-                            <div class="card-value" id="card-total-spills">–</div>
+                            <div class="card-title">Raw sewage spills</div>
+                            <div class="card-body" id="card-spills-text">–</div>
                             <div class="card-sub" id="card-date-range">&nbsp;</div>
                         </div>
                         <div class="card">
-                            <div class="card-title">Total gallons spilled</div>
-                            <div class="card-value" id="card-total-volume">–</div>
-                            <div class="card-sub">Distinct utilities: <span id="card-distinct-utils">–</span></div>
+                            <div class="card-title">Gallons of raw sewage</div>
+                            <div class="card-body" id="card-volume-text">–</div>
+                            <div class="card-sub" id="card-distincts">–</div>
                         </div>
                         <div class="card">
-                            <div class="card-title">Total duration (hrs)</div>
-                            <div class="card-value" id="card-total-duration">–</div>
-                            <div class="card-sub">Receiving waters: <span id="card-distinct-waters">–</span></div>
+                            <div class="card-title">Time sewage was spilling</div>
+                            <div class="card-body" id="card-duration-text">–</div>
                         </div>
                         <div class="card" id="equivalents-card">
                             <div class="card-title">How much is that?</div>
@@ -108,7 +112,7 @@
                         </div>
                     </div>
 
-                    <div class="charts">
+                    <div class="charts" id="charts-time-series">
                         <div class="panel">
                             <h2>Spills over time</h2>
                             <div id="chart-count-empty" class="chart-empty" hidden>No data for the selected range.</div>
@@ -120,14 +124,15 @@
                             <canvas id="chart-volume"></canvas>
                         </div>
                     </div>
+                    <div id="chart-range-note" class="panel chart-empty hidden" aria-live="polite">Time-series charts are shown for date ranges of 60 days or longer.</div>
 
                     <h2 class="section-title">Top receiving waters</h2>
                     <div class="two-col">
                         <div class="panel table-container">
                             <table id="receiving-table">
                                 <thead>
-                                    <tr>
-                                        <th data-sort="receiving_water_name">Receiving water</th>
+                                        <tr>
+                                        <th data-sort="receiving_water">Receiving water</th>
                                         <th data-sort="total_volume_gallons">Total volume</th>
                                         <th data-sort="spill_count">Spills</th>
                                     </tr>

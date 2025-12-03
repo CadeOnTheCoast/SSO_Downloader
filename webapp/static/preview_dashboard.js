@@ -23,6 +23,9 @@
     if (allowMillions && Math.abs(num) >= 1_000_000) {
       return `${(num / 1_000_000).toFixed(1)}M`;
     }
+    if (Math.abs(num) >= 1_000) {
+      return `${(num / 1_000).toFixed(1)}k`;
+    }
     return num.toLocaleString(undefined, { maximumFractionDigits: 1 });
   }
 
@@ -35,14 +38,61 @@
     return '';
   }
 
+  function parseDate(value) {
+    if (!value) return null;
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function buildRangeInfo(range) {
+    if (!range) return null;
+    const start = parseDate(range.min);
+    const end = parseDate(range.max);
+    if (!start || !end) return null;
+    const diffMs = end.getTime() - start.getTime();
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    return { start, end, days, label: formatDateRange(range) };
+  }
+
+  function describeDuration(hours) {
+    if (!hours || hours <= 0) return 'Raw sewage was spilling for less than an hour over this period.';
+    const wholeHours = Math.floor(hours);
+    let daysTotal;
+    let remainingHours;
+    [daysTotal, remainingHours] = divmod(wholeHours, 24);
+    let years;
+    [years, daysTotal] = divmod(daysTotal, 365);
+    let weeks;
+    [weeks, daysTotal] = divmod(daysTotal, 7);
+    const days = daysTotal;
+
+    const parts = [];
+    if (years) parts.push(`${years} year${years === 1 ? '' : 's'}`);
+    if (weeks) parts.push(`${weeks} week${weeks === 1 ? '' : 's'}`);
+    if (days) parts.push(`${days} day${days === 1 ? '' : 's'}`);
+    if (remainingHours) parts.push(`${remainingHours} hour${remainingHours === 1 ? '' : 's'}`);
+    if (!parts.length) parts.push(`${wholeHours} hour${wholeHours === 1 ? '' : 's'}`);
+
+    const description = parts.join(', ');
+    return `Raw sewage was spilling for about ${description} over this period.`;
+  }
+
+  function divmod(value, divisor) {
+    const quotient = Math.floor(value / divisor);
+    const remainder = value % divisor;
+    return [quotient, remainder];
+  }
+
   function buildQueryParams() {
     const params = new URLSearchParams();
     const utilityValue = document.getElementById('utility-search').value.trim();
+    const permitValue = document.getElementById('permit-search').value.trim();
     const countyValue = document.getElementById('county-search').value.trim();
     const startDate = document.getElementById('start_date').value;
     const endDate = document.getElementById('end_date').value;
 
-    if (utilityValue) params.set('utility_id', utilityValue);
+    if (utilityValue) params.set('utility_name', utilityValue);
+    if (permitValue) params.set('permit', permitValue);
     if (countyValue) params.set('county', countyValue);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
@@ -51,7 +101,8 @@
 
   function ensureFilters(params) {
     return (
-      params.has('utility_id') ||
+      params.has('utility_name') ||
+      params.has('permit') ||
       params.has('county') ||
       params.has('start_date') ||
       params.has('end_date')
@@ -79,8 +130,9 @@
 
     state.utilities.forEach((item) => {
       const option = document.createElement('option');
-      option.value = item.id;
-      option.label = `${item.name} (${item.id})`;
+      const permits = (item.permits || []).join(', ');
+      option.value = item.name;
+      option.label = permits ? `${item.name} (${permits})` : item.name;
       utilityList.appendChild(option);
     });
 
@@ -105,7 +157,7 @@
       } catch (err) {
         data = await fetchJson('/filters');
       }
-      state.utilities = (data.utilities || []).sort((a, b) => a.name.localeCompare(b.name));
+      state.utilities = (data.permittees || data.utilities || []).sort((a, b) => a.name.localeCompare(b.name));
       state.counties = (data.counties || []).sort((a, b) => a.localeCompare(b));
       populateOptions();
     } catch (err) {
@@ -150,20 +202,48 @@
   function toggleVisibility(hasData) {
     document.getElementById('dashboard').classList.toggle('hidden', !hasData);
     document.getElementById('empty-message').classList.toggle('hidden', hasData);
+    if (!hasData) {
+      Object.keys(state).forEach((key) => {
+        const maybeChart = state[key];
+        if (maybeChart && typeof maybeChart.destroy === 'function') {
+          maybeChart.destroy();
+          state[key] = null;
+        }
+      });
+    }
   }
 
   function destroyChart(chart) {
     if (chart) chart.destroy();
   }
 
-  function renderCards(summary) {
+  function renderCards(summary, rangeInfo) {
     const counts = summary.summary_counts || {};
-    document.getElementById('card-total-spills').textContent = formatNumber(counts.total_records, { allowMillions: false });
-    document.getElementById('card-total-volume').textContent = formatNumber(counts.total_volume_gallons || 0);
-    document.getElementById('card-total-duration').textContent = formatNumber(counts.total_duration_hours || 0, { allowMillions: false });
-    document.getElementById('card-distinct-utils').textContent = formatNumber(counts.distinct_utilities, { allowMillions: false });
-    document.getElementById('card-distinct-waters').textContent = formatNumber(counts.distinct_receiving_waters, { allowMillions: false });
-    document.getElementById('card-date-range').textContent = formatDateRange(counts.date_range) || '\u00a0';
+    const totalSpills = counts.total_spills ?? counts.total_records ?? 0;
+    const totalVolume = counts.total_volume_gallons || 0;
+    const durationHours = counts.total_duration_hours || 0;
+    const distinctUtilities = counts.distinct_utilities;
+    const distinctWaters = counts.distinct_receiving_waters;
+
+    const days = rangeInfo?.days || 0;
+    const hours = days ? days * 24 : 0;
+    const spillsPerDay = days ? (totalSpills / days).toFixed(1) : '–';
+    const gallonsPerHour = hours ? (totalVolume / hours).toFixed(1) : '–';
+    const startLabel = rangeInfo?.start
+      ? rangeInfo.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'the selected period';
+    const endLabel = rangeInfo?.end
+      ? rangeInfo.end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'the selected period';
+
+    const spillsText = `There were ${formatNumber(totalSpills, { allowMillions: false })} raw sewage spills from ${startLabel} to ${endLabel}. That’s about ${spillsPerDay} spills per day.`;
+    const volumeText = `From ${startLabel} to ${endLabel}, ${formatNumber(totalVolume)} gallons of raw sewage were reported. That’s about ${gallonsPerHour} gallons spilled per hour.`;
+
+    document.getElementById('card-spills-text').textContent = spillsText;
+    document.getElementById('card-volume-text').textContent = volumeText;
+    document.getElementById('card-duration-text').textContent = describeDuration(durationHours);
+    document.getElementById('card-date-range').textContent = rangeInfo?.label || '\u00a0';
+    document.getElementById('card-distincts').textContent = `${formatNumber(distinctUtilities, { allowMillions: false })} utilities, ${formatNumber(distinctWaters, { allowMillions: false })} receiving waters`;
   }
 
   function renderEquivalents(summary) {
@@ -184,27 +264,61 @@
     const depthFt = (volume / 7.48) / (360 * 160);
     const depthInches = depthFt * 12;
 
-    const parts = [
-      `Approximately ${formatNumber(volume)} gallons reported over this period.`,
-    ];
-    if (pools >= 0.5) parts.push(`${Math.round(pools)} Olympic swimming pools`);
-    if (kegs >= 1) parts.push(`${Math.round(kegs).toLocaleString()} kegs of beer`);
-    if (balloons >= 10) parts.push(`${Math.round(balloons).toLocaleString()} water balloons`);
-    if (depthInches >= 0.1) parts.push(`enough to cover a football field about ${depthInches.toFixed(1)} inches deep`);
+    const comparisons = [];
+    if (pools >= 0.5) comparisons.push(`${Math.round(pools)} Olympic swimming pools`);
+    if (kegs >= 1) comparisons.push(`${Math.round(kegs).toLocaleString()} kegs of beer`);
+    if (balloons >= 10) comparisons.push(`${Math.round(balloons).toLocaleString()} water balloons`);
+    if (depthInches >= 0.1) comparisons.push(`enough to cover a football field about ${depthInches.toFixed(1)} inches deep`);
 
-    textEl.textContent = parts.join(', ');
-    card.classList.toggle('hidden', parts.length === 0);
+    const lead = `Approximately ${formatNumber(volume)} gallons of raw sewage were reported over this period.`;
+    if (!comparisons.length) {
+      textEl.textContent = lead;
+      card.classList.remove('hidden');
+      return;
+    }
+
+    const finalText = `${lead} That’s roughly the same as ${comparisons
+      .map((text, idx) => {
+        if (idx === comparisons.length - 1 && comparisons.length > 1) {
+          return `or ${text}`;
+        }
+        return text;
+      })
+      .join(comparisons.length > 2 ? ', ' : ' ')}.`;
+
+    textEl.textContent = finalText;
+    card.classList.remove('hidden');
   }
 
-  function renderTimeSeries(summary) {
+  function renderTimeSeries(summary, rangeInfo) {
     const { time_series: timeSeries } = summary;
     const countCanvas = document.getElementById('chart-count');
     const volumeCanvas = document.getElementById('chart-volume');
     const countEmpty = document.getElementById('chart-count-empty');
     const volumeEmpty = document.getElementById('chart-volume-empty');
+    const wrapper = document.getElementById('charts-time-series');
+    const note = document.getElementById('chart-range-note');
 
+    const days = rangeInfo?.days || 0;
     const points = (timeSeries && timeSeries.points) || [];
+    if (days < 60) {
+      wrapper.classList.add('hidden');
+      note.classList.remove('hidden');
+      note.textContent = 'Time-series charts are shown for date windows of 60 days or longer.';
+      countEmpty.hidden = true;
+      volumeEmpty.hidden = true;
+      countCanvas.hidden = true;
+      volumeCanvas.hidden = true;
+      destroyChart(state.countChart);
+      destroyChart(state.volumeChart);
+      state.countChart = null;
+      state.volumeChart = null;
+      return;
+    }
+
     if (!points.length || timeSeries.granularity === 'none') {
+      wrapper.classList.remove('hidden');
+      note.classList.add('hidden');
       countEmpty.hidden = false;
       volumeEmpty.hidden = false;
       countCanvas.hidden = true;
@@ -216,14 +330,17 @@
       return;
     }
 
+    note.classList.add('hidden');
+    wrapper.classList.remove('hidden');
     countEmpty.hidden = true;
     volumeEmpty.hidden = true;
-    countCanvas.hidden = false;
-    volumeCanvas.hidden = false;
 
     const labels = points.map((point) => point.period_label);
     const counts = points.map((point) => point.spill_count || 0);
     const volumes = points.map((point) => point.total_volume_gallons || 0);
+
+    countCanvas.hidden = false;
+    volumeCanvas.hidden = false;
 
     if (state.countChart) {
       state.countChart.data.labels = labels;
@@ -318,28 +435,28 @@
     const canvas = document.getElementById(canvasId);
     const empty = document.getElementById(emptyId);
     const chartKey = `${canvasId}Chart`;
-    if (!rows || !rows.length) {
+    if (state[chartKey]) {
+      state[chartKey].destroy();
+      state[chartKey] = null;
+    }
+
+    const rowsWithVolume = (rows || []).filter((row) => {
+      const volume = row.total_volume_gallons ?? row.total_volume ?? 0;
+      return volume > 0;
+    });
+
+    if (!rowsWithVolume.length) {
       empty.hidden = false;
       canvas.hidden = true;
-      if (state[chartKey]) {
-        state[chartKey].destroy();
-        state[chartKey] = null;
-      }
       return;
     }
+
     empty.hidden = true;
     canvas.hidden = false;
-    const labels = rows.map((row) => row[labelKey]);
-    const values = rows.map((row) => row.total_volume_gallons || 0);
-    const percents = rows.map((row) => (row.percent_of_total || 0).toFixed(1));
+    const labels = rowsWithVolume.map((row) => row[labelKey]);
+    const values = rowsWithVolume.map((row) => row.total_volume_gallons ?? row.total_volume ?? 0);
+    const totalVolume = values.reduce((sum, value) => sum + Number(value || 0), 0);
     const colors = labels.map((_, idx) => `hsl(${(idx * 45) % 360} 70% 55%)`);
-
-    if (state[chartKey]) {
-      state[chartKey].data.labels = labels;
-      state[chartKey].data.datasets[0].data = values;
-      state[chartKey].update();
-      return;
-    }
 
     state[chartKey] = new Chart(canvas, {
       type: 'pie',
@@ -357,10 +474,10 @@
           tooltip: {
             callbacks: {
               label(context) {
-                const label = labels[context.dataIndex];
-                const volume = formatNumber(values[context.dataIndex]);
-                const percent = percents[context.dataIndex];
-                return `${label}: ${volume} gal (${percent}%)`;
+                const label = context.label || labels[context.dataIndex];
+                const rawValue = context.raw ?? values[context.dataIndex] ?? 0;
+                const percent = totalVolume ? ((rawValue / totalVolume) * 100).toFixed(1) : '0.0';
+                return `${label}: ${formatNumber(rawValue)} gal (${percent}%)`;
               },
             },
           },
@@ -370,18 +487,24 @@
   }
 
   function renderTopTables(summary) {
-    const receiving = (summary.top_receiving_waters || []).slice(0, 10);
+    const receiving = (summary.top_receiving_waters || [])
+      .slice(0, 10)
+      .map((row) => ({
+        receiving_water: row.receiving_water || row.receiving_water_name || 'Unknown',
+        total_volume_gallons: row.total_volume_gallons ?? row.total_volume ?? 0,
+        spill_count: row.spill_count || 0,
+      }));
     const utilities = summary.top_utilities || [];
-    renderTable('receiving-table', receiving, ['receiving_water_name', 'total_volume_gallons', 'spill_count']);
+    renderTable('receiving-table', receiving, ['receiving_water', 'total_volume_gallons', 'spill_count']);
     renderTable('utility-table', utilities, ['utility_name', 'spill_count', 'total_volume_gallons']);
-    attachSorting('receiving-table', receiving, ['receiving_water_name', 'total_volume_gallons', 'spill_count']);
+    attachSorting('receiving-table', receiving, ['receiving_water', 'total_volume_gallons', 'spill_count']);
     attachSorting('utility-table', utilities, ['utility_name', 'spill_count', 'total_volume_gallons']);
   }
 
   function renderPies(summary, isSpecificUtility) {
     const receivingPie = summary.receiving_waters_pie || [];
     const utilityPie = isSpecificUtility ? [] : summary.top_utilities_pie || [];
-    renderPie('receiving-pie', 'pie-empty', receivingPie, 'receiving_water_name');
+    renderPie('receiving-pie', 'pie-empty', receivingPie, 'receiving_water');
     renderPie('utility-pie', 'utility-pie-empty', utilityPie, 'utility_name');
   }
 
@@ -399,6 +522,7 @@
     try {
       const response = await fetchJson(`/api/ssos/summary?${query}`);
       const counts = response.summary_counts || {};
+      const rangeInfo = buildRangeInfo(counts.date_range);
       const hasData = (response.top_receiving_waters && response.top_receiving_waters.length) || counts.total_records;
       toggleVisibility(Boolean(hasData));
       if (!hasData) {
@@ -406,11 +530,11 @@
         return;
       }
 
-      renderCards(response);
+      renderCards(response, rangeInfo);
       renderEquivalents(response);
-      renderTimeSeries(response);
+      renderTimeSeries(response, rangeInfo);
       renderTopTables(response);
-      const hasUtilityFilter = params.has('utility_id');
+      const hasUtilityFilter = params.has('utility_name') || params.has('permit');
       document.getElementById('pie-title').textContent = hasUtilityFilter
         ? 'Volume by receiving water'
         : 'Volume by receiving water (all utilities)';

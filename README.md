@@ -64,6 +64,9 @@ A lightweight FastAPI layer is available for quick filtered downloads and previe
   - `/api/options` – metadata for populating UI dropdowns (alias for `/filters`)
   - `/download` and `/filters` – legacy endpoints kept for compatibility with earlier modules
 - **Config:** honors the same `SSO_API_BASE_URL`, `SSO_API_KEY`, and `SSO_API_TIMEOUT` env vars used by the CLI.
+- **Wiring notes:** the download page pulls options from `/api/options` (falling back to `/filters`), downloads via `/api/ssos.csv`, and previews summaries via `/api/ssos/summary`. The dashboard page uses the same `/api/options` metadata plus `/api/ssos` and `/api/ssos/summary` for charts and tables. See `docs/architecture_sso_downloader.md` for a concise module map.
+
+For a quick manual verification path, follow `docs/smoke_test.md` after starting the FastAPI app in reload mode.
 
 This module is intended as a thin shell that future dashboards can extend without re-implementing query or CSV logic.
 

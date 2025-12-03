@@ -58,33 +58,30 @@ A lightweight FastAPI layer is available for quick filtered downloads and previe
 - **Run locally:** `uvicorn webapp.api:app --reload`
 - **Endpoints:**
   - `/` – minimal HTML UI with dropdowns for utility/county and date range inputs
-  - `/download` – CSV download for the selected filters
+  - `/api/ssos` – JSON records honoring the same filters as the CLI
+  - `/api/ssos.csv` – CSV download for the selected filters (alias for `/download`)
   - `/api/ssos/summary` – dashboard-ready aggregate JSON (with `/summary` as a legacy alias)
-  - `/filters` – metadata for populating UI dropdowns
+  - `/api/options` – metadata for populating UI dropdowns (alias for `/filters`)
+  - `/download` and `/filters` – legacy endpoints kept for compatibility with earlier modules
 - **Config:** honors the same `SSO_API_BASE_URL`, `SSO_API_KEY`, and `SSO_API_TIMEOUT` env vars used by the CLI.
 
-This module is intended as a thin shell that future dashboards (Module G) can extend without re-implementing query or CSV logic.
+This module is intended as a thin shell that future dashboards can extend without re-implementing query or CSV logic.
 
-### Interactive dashboard (Module G)
+### Dashboard (Module I)
 
-Module G layers a human-friendly dashboard on top of the existing FastAPI app and analytics helpers.
+Module I layers a human-friendly dashboard on top of the FastAPI app and analytics helpers.
 
 - **Run locally:** `uvicorn webapp.api:app --reload` and open `http://127.0.0.1:8000/dashboard`.
 - **Features:**
-  - Filters for utility, county, and date range (with optional record limit).
-  - Summary cards for total spills and volume statistics.
-  - Charts for spills over time and volume by utility (Chart.js via CDN).
-  - Tabular record view with the same filters applied.
-  - CSV download button that reuses the `/download` endpoint.
+  - Filters for utility, county, and date range (with optional record limit for the table).
+  - Summary cards for totals, distinct utilities, and volume statistics with a visible date range.
+  - Charts for spills by month, volume by utility (top 10), and counts by volume bucket (Chart.js via CDN).
+  - Tabular record preview sourced from `/api/ssos` with a CSV download button wired to `/api/ssos.csv`.
 - **Dashboard API endpoints:**
-  - `/filters` – utility and county options for form controls.
+  - `/api/options` (or `/filters`) – utility and county options for form controls.
   - `/api/ssos/summary` – aggregate metrics (totals plus by-month, by-utility, and volume buckets).
-  - `/series/by_date` – time series JSON for charts (`points` with date, count, total_volume_gallons).
-  - `/series/by_utility` – grouped bar data by utility (`bars` with label, count, total_volume_gallons).
-  - `/records` – normalized record list for the table view.
-  - `/download` – CSV export for the current filters.
-
-Module G is UI-only: it reuses Modules A–F for querying, normalization, CSV export, and analytics without adding new data sources.
+  - `/api/ssos` – normalized records for the table view (supports `limit`/`offset`).
+  - `/api/ssos.csv` – CSV export for the current filters.
 
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 

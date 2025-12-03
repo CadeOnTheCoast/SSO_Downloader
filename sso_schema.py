@@ -1,9 +1,11 @@
 """Canonical schema and query helpers for SSO records."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional
+
+from sso_volume import enrich_est_volume_fields, parse_est_volume
 
 # Field names as returned by the ArcGIS layer
 UTILITY_ID_FIELD = "permit_no"
@@ -23,24 +25,28 @@ LOCATION_FIELD = "location"
 class SSORecord:
     """Canonical representation of an SSO record."""
 
-    sso_id: Optional[str]
-    utility_id: Optional[str]
-    utility_name: Optional[str]
-    sewer_system: Optional[str]
-    county: Optional[str]
-    location_desc: Optional[str]
+    sso_id: Optional[str] = None
+    utility_id: Optional[str] = None
+    utility_name: Optional[str] = None
+    sewer_system: Optional[str] = None
+    county: Optional[str] = None
+    location_desc: Optional[str] = None
 
-    date_sso_began: Optional[datetime]
-    date_sso_stopped: Optional[datetime]
+    date_sso_began: Optional[datetime] = None
+    date_sso_stopped: Optional[datetime] = None
 
-    volume_gallons: Optional[float]
-    cause: Optional[str]
-    receiving_water: Optional[str]
+    volume_gallons: Optional[float] = None
+    est_volume: Optional[str] = None
+    est_volume_gal: Optional[int] = None
+    est_volume_is_range: Optional[bool] = None
+    est_volume_range_label: Optional[str] = None
+    cause: Optional[str] = None
+    receiving_water: Optional[str] = None
 
-    x: Optional[float]
-    y: Optional[float]
+    x: Optional[float] = None
+    y: Optional[float] = None
 
-    raw: Dict[str, Any]
+    raw: Dict[str, Any] = field(default_factory=dict)
 
 
 def _coerce_str(value: Any) -> Optional[str]:
@@ -100,6 +106,30 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
     """
 
     raw_dict = dict(raw)
+    enrich_est_volume_fields(raw_dict)
+
+    est_volume_value = _coerce_str(raw_dict.get("est_volume"))
+    est_volume_gal, est_volume_is_range, est_volume_range_label = parse_est_volume(
+        est_volume_value
+    )
+
+    if raw_dict.get("est_volume_gal") is not None:
+        try:
+            est_volume_gal = int(float(raw_dict.get("est_volume_gal")))
+        except (TypeError, ValueError):
+            pass
+
+    est_volume_is_range_bool: Optional[bool] = est_volume_is_range
+    raw_is_range = raw_dict.get("est_volume_is_range")
+    if isinstance(raw_is_range, str):
+        est_volume_is_range_bool = raw_is_range.upper() == "Y"
+    elif raw_is_range is not None:
+        est_volume_is_range_bool = bool(raw_is_range)
+
+    volume_value = _coerce_float(raw_dict.get(VOLUME_GALLONS_FIELD))
+    if volume_value is None and est_volume_gal is not None:
+        volume_value = _coerce_float(est_volume_gal)
+
     return SSORecord(
         sso_id=_coerce_str(raw_dict.get(SSO_ID_FIELD)),
         utility_id=_coerce_str(raw_dict.get(UTILITY_ID_FIELD)),
@@ -109,7 +139,11 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
         location_desc=_coerce_str(raw_dict.get("location_desc") or raw_dict.get(LOCATION_FIELD)),
         date_sso_began=_parse_datetime(raw_dict.get(START_DATE_FIELD)),
         date_sso_stopped=_parse_datetime(raw_dict.get(END_DATE_FIELD)),
-        volume_gallons=_coerce_float(raw_dict.get(VOLUME_GALLONS_FIELD)),
+        volume_gallons=volume_value,
+        est_volume=est_volume_value,
+        est_volume_gal=est_volume_gal,
+        est_volume_is_range=est_volume_is_range_bool,
+        est_volume_range_label=est_volume_range_label,
         cause=_coerce_str(raw_dict.get(CAUSE_FIELD)),
         receiving_water=_coerce_str(
             raw_dict.get(RECEIVING_WATER_FIELD) or raw_dict.get("waterbody")

@@ -23,6 +23,7 @@ from sso_analytics import (
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv_filelike
 from sso_schema import SSOQuery, normalize_sso_records
+from sso_volume import enrich_est_volume_fields
 
 app = FastAPI(title="SSO Downloader")
 
@@ -171,6 +172,9 @@ def _download_csv_response(
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    for record in records:
+        enrich_est_volume_fields(record)
+
     buffer = io.StringIO()
     write_ssos_to_csv_filelike(records, buffer)
     buffer.seek(0)
@@ -207,6 +211,9 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
         raw_records = client.fetch_ssos(query=query, limit=safe_limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    for record in raw_records:
+        enrich_est_volume_fields(record)
 
     records_norm = normalize_sso_records(raw_records)
     return build_dashboard_summary(records_norm)
@@ -318,6 +325,9 @@ def _fetch_normalized_records(
         raw_records = client.fetch_ssos(query=query, limit=safe_limit + params.offset)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    for record in raw_records:
+        enrich_est_volume_fields(record)
 
     normalized = normalize_sso_records(raw_records)
     sliced = normalized[params.offset : params.offset + safe_limit]

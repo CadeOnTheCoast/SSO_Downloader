@@ -12,6 +12,8 @@ The repository now includes a reusable client and CLI that query ADEM's ArcGIS R
 - **CLI:** `sso_download.py` uses the client and exporter to pull data from the ArcGIS API.
 - **Analytics and QA:** `sso_analytics.py` computes reusable summaries (totals by utility, county, or month), top-N helpers, and basic QA checks for missing fields or odd volume text. These helpers operate on normalized `SSORecord` objects from `sso_schema.py` and can be used by the CLI or future dashboards.
 
+Volume fields are normalized automatically: the raw `est_volume` string from ADEM is preserved, while structured columns `est_volume_gal` (upper bound for bucketed ranges), `est_volume_is_range` (`Y/N`), and `est_volume_range_label` are added to CSV exports. Summaries and averages use `est_volume_gal`, so bucketed values contribute their upper bound to totals.
+
 Configuration:
 
 - `SSO_API_BASE_URL`: Override the ArcGIS query endpoint (defaults to `https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query`).

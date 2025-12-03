@@ -8,6 +8,7 @@ from typing import Dict, List
 
 from sso_analytics import QAIssue, run_basic_qa, summarize_overall_volume, summarize_volume_by_utility
 from sso_schema import normalize_sso_records
+from sso_volume import enrich_est_volume_fields
 
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv
@@ -163,6 +164,9 @@ def main(argv: list[str] | None = None) -> int:
     if not records:
         print("No records returned for the given filters.")
         return 0
+
+    for record in records:
+        enrich_est_volume_fields(record)
 
     records_norm = normalize_sso_records(records)
     write_ssos_to_csv(records, args.output)

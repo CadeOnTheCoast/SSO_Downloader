@@ -24,6 +24,7 @@ from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv_filelike
 from sso_schema import SSOQuery, normalize_sso_records
 from sso_volume import enrich_est_volume_fields
+from webapp.options_data import ALABAMA_COUNTIES
 
 app = FastAPI(title="SSO Downloader")
 
@@ -38,12 +39,7 @@ DEFAULT_UTILITIES = [
     {"id": "AL0027561", "name": "Mobile Area Water & Sewer"},
     {"id": "AL0063002", "name": "City of Fairhope"},
 ]
-DEFAULT_COUNTIES = [
-    "Mobile",
-    "Baldwin",
-    "Montgomery",
-    "Jefferson",
-]
+DEFAULT_COUNTIES = ALABAMA_COUNTIES
 
 
 class SSOQueryParams(BaseModel):
@@ -114,16 +110,37 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _load_options(client: SSOClient) -> dict[str, object]:
+    utilities = DEFAULT_UTILITIES
+    counties = list(DEFAULT_COUNTIES)
+
+    try:
+        fresh_utilities = client.list_utilities()
+        if fresh_utilities:
+            utilities = fresh_utilities
+    except Exception:
+        utilities = DEFAULT_UTILITIES
+
+    try:
+        fresh_counties = client.list_counties()
+        if fresh_counties:
+            counties = fresh_counties
+    except Exception:
+        counties = list(DEFAULT_COUNTIES)
+
+    return {"utilities": utilities, "counties": counties}
+
+
 @app.get("/filters")
-def list_filters() -> dict[str, object]:
-    return {"utilities": DEFAULT_UTILITIES, "counties": DEFAULT_COUNTIES}
+def list_filters(client: SSOClient = Depends(get_client)) -> dict[str, object]:
+    return _load_options(client)
 
 
 @app.get("/api/options")
-def list_options() -> dict[str, object]:
+def list_options(client: SSOClient = Depends(get_client)) -> dict[str, object]:
     """Alias for UI filter metadata used by the dashboard."""
 
-    return list_filters()
+    return _load_options(client)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -216,7 +233,12 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
         enrich_est_volume_fields(record)
 
     records_norm = normalize_sso_records(raw_records)
-    return build_dashboard_summary(records_norm)
+    summary = build_dashboard_summary(records_norm)
+
+    if params.utility_id or params.utility_name:
+        summary["top_utilities_pie"] = []
+
+    return summary
 
 
 @app.get("/api/ssos/summary")

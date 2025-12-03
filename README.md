@@ -59,12 +59,13 @@ A lightweight FastAPI layer is available for quick filtered downloads and previe
 
 - **Run locally:** `uvicorn webapp.api:app --reload`
 - **Endpoints:**
-  - `/` – minimal HTML UI with dropdowns for utility/county and date range inputs
+  - `/` – dashboard-style HTML UI with searchable utility/county selectors, summary cards, charts, and CSV export
   - `/api/ssos` – JSON records honoring the same filters as the CLI
   - `/api/ssos.csv` – CSV download for the selected filters (alias for `/download`)
   - `/api/ssos/summary` – dashboard-ready aggregate JSON (with `/summary` as a legacy alias)
   - `/api/options` – metadata for populating UI dropdowns (alias for `/filters`)
   - `/download` and `/filters` – legacy endpoints kept for compatibility with earlier modules
+  - Static assets use a lightweight Chart.js CDN include (no build step needed).
 - **Config:** honors the same `SSO_API_BASE_URL`, `SSO_API_KEY`, and `SSO_API_TIMEOUT` env vars used by the CLI.
 - **Wiring notes:** the download page pulls options from `/api/options` (falling back to `/filters`), downloads via `/api/ssos.csv`, and previews summaries via `/api/ssos/summary`. The dashboard page uses the same `/api/options` metadata plus `/api/ssos` and `/api/ssos/summary` for charts and tables. See `docs/architecture_sso_downloader.md` for a concise module map.
 
@@ -87,6 +88,30 @@ Module I layers a human-friendly dashboard on top of the FastAPI app and analyti
   - `/api/ssos/summary` – aggregate metrics (totals plus by-month, by-utility, and volume buckets).
   - `/api/ssos` – normalized records for the table view (supports `limit`/`offset`).
   - `/api/ssos.csv` – CSV export for the current filters.
+
+### Summary JSON structure (dashboard)
+
+`/api/ssos/summary` returns a dashboard-friendly object that powers the Preview Summary UI:
+
+```
+{
+  "summary_counts": {
+    "total_records": 123,
+    "total_volume_gallons": 456789.0,
+    "total_duration_hours": 12.5,
+    "distinct_utilities": 8,
+    "distinct_receiving_waters": 5,
+    "date_range": {"min": "2023-01-01", "max": "2023-03-31"}
+  },
+  "time_series": {"granularity": "month"|"year"|"none", "points": [...]},
+  "top_utilities": [...],
+  "top_utilities_pie": [...],
+  "top_receiving_waters": [...],
+  "receiving_waters_pie": [...]
+}
+```
+
+Chart series and tables honor the requested filters. Pie slices are omitted when the user filters to a single utility or when total volume is zero.
 
 The legacy Playwright-based downloader/parser scripts remain available below but are treated as legacy compared to the ArcGIS path above.
 

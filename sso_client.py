@@ -54,6 +54,17 @@ class SSOClient:
         self.timeout = timeout if timeout is not None else config.timeout
         self.session = session or requests.Session()
 
+    def _get(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        response = self.session.get(self.base_url, params=params, timeout=self.timeout)
+        if not response.ok:
+            raise SSOClientError(
+                f"Request failed with status {response.status_code}: {response.text[:200]}"
+            )
+        try:
+            return response.json()
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise SSOClientError("Failed to decode JSON response") from exc
+
     def fetch_ssos(
         self,
         query: SSOQuery | None = None,
@@ -92,15 +103,7 @@ class SSOClient:
             page_params = dict(params)
             page_params["resultOffset"] = offset
             page_params["resultRecordCount"] = page_size
-            response = self.session.get(self.base_url, params=page_params, timeout=self.timeout)
-            if not response.ok:
-                raise SSOClientError(
-                    f"Request failed with status {response.status_code}: {response.text[:200]}"
-                )
-            try:
-                data = response.json()
-            except ValueError as exc:
-                raise SSOClientError("Failed to decode JSON response") from exc
+            data = self._get(page_params)
 
             feature_list: List[Dict[str, Any]] = list(data.get("features", []) or [])
             if not feature_list:
@@ -159,3 +162,58 @@ class SSOClient:
             end_date=end,
             extra_params=extra_params,
         )
+
+    def _distinct_values(
+        self, fields: list[str], *, order_by: str | None = None
+    ) -> list[dict[str, Any]]:
+        params: Dict[str, Any] = {
+            "where": "1=1",
+            "outFields": ",".join(fields),
+            "returnDistinctValues": True,
+            "f": "json",
+            "resultRecordCount": 2000,
+        }
+        if order_by:
+            params["orderByFields"] = order_by
+        data = self._get(params)
+        feature_list: list[dict[str, Any]] = list(data.get("features", []) or [])
+        values: list[dict[str, Any]] = []
+        for feature in feature_list:
+            attrs = dict(feature.get("attributes", {}))
+            values.append(attrs)
+        return values
+
+    def list_utilities(self) -> list[dict[str, str]]:
+        """Return distinct utilities available in the ArcGIS layer."""
+
+        raw_utilities = self._distinct_values(
+            [UTILITY_ID_FIELD, UTILITY_NAME_FIELD], order_by=UTILITY_NAME_FIELD
+        )
+        seen: dict[str, dict[str, str]] = {}
+        for attrs in raw_utilities:
+            utility_id = str(attrs.get(UTILITY_ID_FIELD) or "").strip()
+            utility_name = str(attrs.get(UTILITY_NAME_FIELD) or "").strip()
+            if not utility_id and not utility_name:
+                continue
+            key = utility_id or utility_name
+            existing = seen.get(key)
+            if existing:
+                if utility_name and not existing.get("name"):
+                    existing["name"] = utility_name
+                continue
+            seen[key] = {"id": utility_id or utility_name, "name": utility_name or utility_id}
+
+        return sorted(seen.values(), key=lambda item: item["name"].lower())
+
+    def list_counties(self) -> list[str]:
+        """Return distinct counties present in the ArcGIS layer."""
+
+        raw_counties = self._distinct_values([COUNTY_FIELD], order_by=COUNTY_FIELD)
+        counties: list[str] = []
+        for attrs in raw_counties:
+            county = str(attrs.get(COUNTY_FIELD) or "").strip()
+            if not county:
+                continue
+            counties.append(county)
+        counties = sorted(set(counties), key=lambda name: name.lower())
+        return counties

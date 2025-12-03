@@ -118,6 +118,13 @@ def list_filters() -> dict[str, object]:
     return {"utilities": DEFAULT_UTILITIES, "counties": DEFAULT_COUNTIES}
 
 
+@app.get("/api/options")
+def list_options() -> dict[str, object]:
+    """Alias for UI filter metadata used by the dashboard."""
+
+    return list_filters()
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {"request": request})
@@ -149,11 +156,9 @@ def _build_filename(params: SSOQueryParams) -> str:
     return "_".join(parts) + ".csv"
 
 
-@app.get("/download")
-def download_csv(
-    params: SSOQueryParams = Depends(),
-    client: SSOClient = Depends(get_client),
-):
+def _download_csv_response(
+    params: SSOQueryParams, client: SSOClient
+) -> StreamingResponse:
     _ensure_filters(params)
     query = params.to_sso_query()
     try:
@@ -178,6 +183,14 @@ def download_csv(
         media_type="text/csv; charset=utf-8",
         headers=headers,
     )
+
+
+@app.get("/download")
+def download_csv(
+    params: SSOQueryParams = Depends(),
+    client: SSOClient = Depends(get_client),
+):
+    return _download_csv_response(params, client)
 
 
 def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
@@ -283,6 +296,34 @@ class RecordsQueryParams(SSOQueryParams):
     limit: Optional[int] = Field(default=200, ge=1, le=10000)
 
 
+def _fetch_normalized_records(
+    params: RecordsQueryParams,
+    client: SSOClient,
+    *,
+    default_limit: int = 200,
+    maximum: int = 1000,
+):
+    """Shared record fetching logic for JSON table endpoints."""
+
+    _ensure_filters(params)
+    query = params.to_sso_query()
+    try:
+        query.validate()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    safe_limit = params.bounded_limit(default=params.limit or default_limit, maximum=maximum)
+
+    try:
+        raw_records = client.fetch_ssos(query=query, limit=safe_limit + params.offset)
+    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    normalized = normalize_sso_records(raw_records)
+    sliced = normalized[params.offset : params.offset + safe_limit]
+    return sliced, len(normalized), safe_limit
+
+
 def _serialize_record(record) -> dict[str, object]:
     return {
         "id": record.sso_id,
@@ -309,26 +350,30 @@ def list_records(
     params: RecordsQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
-    _ensure_filters(params)
-    query = params.to_sso_query()
-    try:
-        query.validate()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    safe_limit = params.bounded_limit(default=500, maximum=1000)
-
-    try:
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit + params.offset)
-    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    normalized = normalize_sso_records(raw_records)
-    sliced = normalized[params.offset : params.offset + safe_limit]
+    sliced, total, safe_limit = _fetch_normalized_records(
+        params, client, default_limit=500, maximum=1000
+    )
 
     return {
         "records": [_serialize_record(record) for record in sliced],
-        "total": len(normalized),
+        "total": total,
+        "offset": params.offset,
+        "limit": safe_limit,
+    }
+
+
+@app.get("/api/ssos")
+def api_ssos(
+    params: RecordsQueryParams = Depends(),
+    client: SSOClient = Depends(get_client),
+):
+    sliced, total, safe_limit = _fetch_normalized_records(
+        params, client, default_limit=200, maximum=5000
+    )
+
+    return {
+        "items": [_serialize_record(record) for record in sliced],
+        "total": total,
         "offset": params.offset,
         "limit": safe_limit,
     }
@@ -337,3 +382,11 @@ def list_records(
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {"request": request})
+
+
+@app.get("/api/ssos.csv")
+def api_ssos_csv(
+    params: SSOQueryParams = Depends(),
+    client: SSOClient = Depends(get_client),
+):
+    return _download_csv_response(params, client)

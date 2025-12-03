@@ -5,104 +5,138 @@
     <title>SSO Dashboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
     <style>
-        body { font-family: Arial, sans-serif; margin: 1.5rem; background: #f7f7f7; }
-        h1 { margin-bottom: 0.5rem; }
-        .layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
-        .panel { background: #fff; border: 1px solid #e2e2e2; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .panel h2 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
-        label { display: block; margin-top: 0.75rem; font-weight: 600; }
-        select, input { width: 100%; padding: 0.55rem; margin-top: 0.35rem; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 0.6rem 0.9rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
-        #apply-filters { background: #2563eb; color: #fff; }
-        #download-csv { background: #065f46; color: #fff; margin-left: 0.5rem; }
-        .button-row { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
-        .card { background: #fff; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-        .card-title { color: #6b7280; font-size: 0.85rem; }
-        .card-value { font-size: 1.4rem; font-weight: bold; margin-top: 0.35rem; }
+        :root {
+            --panel: #ffffff;
+            --border: #e5e7eb;
+            --muted: #6b7280;
+            --primary: #2563eb;
+            --bg: #f8fafc;
+        }
+        body { font-family: "Inter", system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: #0f172a; }
+        header { background: #0f172a; color: #fff; padding: 1.25rem 1.5rem; }
+        header h1 { margin: 0; font-size: 1.5rem; }
+        header p { margin: 0.35rem 0 0; color: rgba(255,255,255,0.8); }
+        nav { margin-top: 0.75rem; display: flex; gap: 1rem; align-items: center; }
+        nav a { color: #bfdbfe; text-decoration: none; font-weight: 600; }
+        nav a:hover { color: #fff; }
+        main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        .layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.25rem; align-items: start; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .panel h2 { margin: 0 0 0.65rem; font-size: 1.05rem; }
+        label { display: block; margin-top: 0.75rem; font-weight: 600; font-size: 0.95rem; }
+        select, input { width: 100%; padding: 0.55rem; margin-top: 0.35rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
+        button { padding: 0.6rem 0.9rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.95rem; }
+        #apply-filters { background: var(--primary); color: #fff; }
+        #download-csv { background: #047857; color: #fff; }
+        .button-row { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+        .status { margin-top: 0.75rem; color: #b91c1c; min-height: 1.1rem; font-weight: 600; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; }
+        .card { background: var(--panel); padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .card-title { color: var(--muted); font-size: 0.85rem; }
+        .card-value { font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem; }
+        .card-sub { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
         .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .chart-empty { color: var(--muted); font-style: italic; text-align: center; padding: 1.25rem 0.5rem; }
         .table-container { overflow-x: auto; margin-top: 1rem; }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th, td { padding: 0.6rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th, td { padding: 0.6rem; border-bottom: 1px solid var(--border); text-align: left; }
         th { background: #f3f4f6; font-weight: 700; }
-        #status { margin-top: 0.75rem; color: #b91c1c; }
+        .table-meta { display: flex; align-items: center; justify-content: space-between; color: var(--muted); margin-bottom: 0.35rem; font-size: 0.9rem; }
+        .pill { display: inline-block; padding: 0.15rem 0.55rem; background: #e0f2fe; color: #075985; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+        @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <header>
         <h1>Sanitary Sewer Overflow Dashboard</h1>
-        <p>Explore SSO reports with filters, summaries, charts, and record details.</p>
+        <p>Filters, headline stats, trend charts, and a preview table powered by the SSO API.</p>
+        <nav>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/">Download</a>
+            <a href="/api/docs">API docs</a>
+        </nav>
     </header>
-    <div class="layout">
-        <aside class="panel">
-            <h2>Filters</h2>
-            <label for="utility-select">Utility</label>
-            <select id="utility-select">
-                <option value="">Any utility</option>
-            </select>
-            <label for="county-select">County</label>
-            <select id="county-select">
-                <option value="">Any county</option>
-            </select>
-            <label for="start-date">Start date</label>
-            <input type="date" id="start-date" />
-            <label for="end-date">End date</label>
-            <input type="date" id="end-date" />
-            <label for="record-limit">Max records</label>
-            <input type="number" id="record-limit" min="1" max="1000" value="200" />
-            <div class="button-row">
-                <button id="apply-filters">Apply filters</button>
-                <button id="download-csv">Download CSV</button>
-            </div>
-            <div id="status" aria-live="polite"></div>
-        </aside>
-        <main>
-            <section class="cards" aria-live="polite">
-                <div class="card">
-                    <div class="card-title">Total spills</div>
-                    <div class="card-value" id="summary-total-count">–</div>
+    <main>
+        <div class="layout">
+            <aside class="panel" aria-label="Filter panel">
+                <h2>Filters</h2>
+                <label for="utility-select">Utility</label>
+                <select id="utility-select">
+                    <option value="">Any utility</option>
+                </select>
+                <label for="county-select">County</label>
+                <select id="county-select">
+                    <option value="">Any county</option>
+                </select>
+                <label for="start-date">Start date</label>
+                <input type="date" id="start-date" />
+                <label for="end-date">End date</label>
+                <input type="date" id="end-date" />
+                <label for="record-limit">Max records (table only)</label>
+                <input type="number" id="record-limit" min="1" max="1000" value="200" />
+                <div class="button-row">
+                    <button id="apply-filters">Apply filters</button>
+                    <button id="download-csv">Download CSV</button>
                 </div>
-                <div class="card">
-                    <div class="card-title">Total volume (gal)</div>
-                    <div class="card-value" id="summary-total-volume">–</div>
+                <div class="status" id="status" aria-live="polite"></div>
+            </aside>
+            <section>
+                <div class="cards" aria-live="polite">
+                    <div class="card">
+                        <div class="card-title">Total spills</div>
+                        <div class="card-value" id="summary-total-count">–</div>
+                        <div class="card-sub" id="summary-date-range">&nbsp;</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Total volume (gal)</div>
+                        <div class="card-value" id="summary-total-volume">–</div>
+                        <div class="card-sub">Distinct utilities: <span id="summary-distinct-utilities">–</span></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Average volume (gal)</div>
+                        <div class="card-value" id="summary-avg-volume">–</div>
+                        <div class="card-sub">Max volume: <span id="summary-max-volume">–</span></div>
+                    </div>
                 </div>
-                <div class="card">
-                    <div class="card-title">Average volume (gal)</div>
-                    <div class="card-value" id="summary-avg-volume">–</div>
+                <div class="charts">
+                    <div class="panel">
+                        <h2>Spills by month</h2>
+                        <div id="time-series-empty" class="chart-empty" hidden>No data for the selected filters.</div>
+                        <canvas id="time-series-chart" aria-label="Spills over time"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h2>Volume by utility (top 10)</h2>
+                        <div id="utility-empty" class="chart-empty" hidden>No data for the selected filters.</div>
+                        <canvas id="utility-chart" aria-label="Volume by utility"></canvas>
+                    </div>
+                    <div class="panel">
+                        <h2>Spills by volume bucket</h2>
+                        <div id="bucket-empty" class="chart-empty" hidden>No data for the selected filters.</div>
+                        <canvas id="bucket-chart" aria-label="Volume bucket distribution"></canvas>
+                    </div>
                 </div>
-                <div class="card">
-                    <div class="card-title">Max volume (gal)</div>
-                    <div class="card-value" id="summary-max-volume">–</div>
-                </div>
+                <section class="panel table-container" aria-live="polite">
+                    <div class="table-meta">
+                        <h2>Matching records</h2>
+                        <div id="table-meta-count" class="pill"></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date began</th>
+                                <th>Utility</th>
+                                <th>County</th>
+                                <th>Volume (gal)</th>
+                                <th>Cause</th>
+                                <th>Receiving water</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-table-body"></tbody>
+                    </table>
+                </section>
             </section>
-            <section class="charts">
-                <div class="panel">
-                    <h2>Spills over time</h2>
-                    <canvas id="time-series-chart"></canvas>
-                </div>
-                <div class="panel">
-                    <h2>Volume by utility</h2>
-                    <canvas id="utility-chart"></canvas>
-                </div>
-            </section>
-            <section class="panel table-container">
-                <h2>Matching records</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date began</th>
-                            <th>Utility</th>
-                            <th>County</th>
-                            <th>Volume (gal)</th>
-                            <th>Cause</th>
-                            <th>Receiving water</th>
-                        </tr>
-                    </thead>
-                    <tbody id="records-table-body"></tbody>
-                </table>
-            </section>
-        </main>
-    </div>
+        </div>
+    </main>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', path='dashboard.js') }}"></script>
 </body>

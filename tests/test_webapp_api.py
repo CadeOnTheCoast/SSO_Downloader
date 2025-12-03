@@ -5,11 +5,6 @@ from typing import List
 
 from fastapi.testclient import TestClient
 
-from datetime import datetime
-from typing import List
-
-from fastapi.testclient import TestClient
-
 from sso_schema import (
     COUNTY_FIELD,
     START_DATE_FIELD,
@@ -123,3 +118,80 @@ def test_dashboard_summary_returns_expected_payload():
     assert payload["by_month"]
     assert payload["by_utility"]
     assert payload["by_volume_bucket"]
+
+
+def test_api_ssos_returns_items_with_limit():
+    records = [
+        {
+            UTILITY_ID_FIELD: "AL1234567",
+            UTILITY_NAME_FIELD: "Utility A",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: datetime(2024, 1, 1),
+            VOLUME_GALLONS_FIELD: 100.0,
+        },
+        {
+            UTILITY_ID_FIELD: "AL7654321",
+            UTILITY_NAME_FIELD: "Utility B",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: datetime(2024, 2, 1),
+            VOLUME_GALLONS_FIELD: 50.0,
+        },
+        {
+            UTILITY_ID_FIELD: "AL0000001",
+            UTILITY_NAME_FIELD: "Utility C",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: datetime(2024, 3, 1),
+            VOLUME_GALLONS_FIELD: 10.0,
+        },
+    ]
+
+    client = _set_client_override(records)
+    response = client.get(
+        "/api/ssos", params={"utility_id": "AL1234567", "limit": 2, "offset": 0}
+    )
+    _clear_overrides()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["items"]
+    assert payload["limit"] == 2
+    assert payload["offset"] == 0
+
+
+def test_api_ssos_requires_filters():
+    client = _set_client_override([])
+    response = client.get("/api/ssos")
+    _clear_overrides()
+
+    assert response.status_code == 400
+    assert "At least one filter" in response.json()["detail"]
+
+
+def test_api_ssos_csv_aliases_download(tmp_path):
+    records = [
+        {
+            UTILITY_ID_FIELD: "AL1234567",
+            UTILITY_NAME_FIELD: "Sample Utility",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: datetime(2024, 1, 1),
+            VOLUME_GALLONS_FIELD: 100.0,
+        }
+    ]
+    client = _set_client_override(records)
+
+    response = client.get("/api/ssos.csv", params={"utility_id": "AL1234567"})
+    _clear_overrides()
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "AL1234567" in response.text
+
+
+def test_api_options_aliases_filters():
+    client = _set_client_override([])
+    response = client.get("/api/options")
+    _clear_overrides()
+
+    payload = response.json()
+    assert "utilities" in payload
+    assert "counties" in payload

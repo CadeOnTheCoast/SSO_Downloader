@@ -71,6 +71,15 @@ def _usable_volume(record: SSORecord) -> Optional[float]:
     return record.volume_gallons
 
 
+def _best_volume(record: SSORecord) -> Optional[float]:
+    if record.est_volume_gal is not None:
+        try:
+            return float(record.est_volume_gal)
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            return None
+    return _usable_volume(record)
+
+
 def _volume_stats(volumes: List[float]) -> VolumeSummary:
     count = len(volumes)
     if not volumes:
@@ -174,6 +183,14 @@ def time_series_by_date(records: Iterable[SSORecord]) -> List[DateSeriesPoint]:
             )
         )
     return points
+
+
+def _duration_hours(record: SSORecord) -> Optional[float]:
+    if record.date_sso_began and record.date_sso_stopped:
+        delta = record.date_sso_stopped - record.date_sso_began
+        hours = delta.total_seconds() / 3600.0
+        return hours if hours >= 0 else 0.0
+    return None
 
 
 def _month_key(record: SSORecord) -> Optional[str]:
@@ -334,37 +351,186 @@ def summarize_by_volume_bucket(records: Sequence[SSORecord]) -> List[Dict[str, A
     return rows
 
 
-def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
-    """Build a single summary payload for the dashboard UI."""
+def _date_bounds(records: Sequence[SSORecord]) -> tuple[Optional[datetime], Optional[datetime]]:
+    dates = [record.date_sso_began for record in records if record.date_sso_began]
+    if not dates:
+        return None, None
+    return min(dates), max(dates)
 
-    volumes = [vol for vol in (_usable_volume(record) for record in records) if vol is not None]
+
+def build_time_series(records: Sequence[SSORecord]) -> Dict[str, Any]:
+    min_date, max_date = _date_bounds(records)
+    if not min_date or not max_date:
+        return {"granularity": "none", "points": []}
+
+    span_days = (max_date.date() - min_date.date()).days
+    if span_days < 60:
+        return {"granularity": "none", "points": []}
+
+    if min_date.year != max_date.year:
+        granularity = "year"
+    else:
+        granularity = "month"
+
+    buckets: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not record.date_sso_began:
+            continue
+        dt = record.date_sso_began
+        if granularity == "year":
+            key = str(dt.year)
+            period_start = datetime(dt.year, 1, 1)
+        else:
+            key = f"{dt.year:04d}-{dt.month:02d}"
+            period_start = datetime(dt.year, dt.month, 1)
+        bucket = buckets.setdefault(
+            key,
+            {
+                "period_label": key,
+                "period_start": period_start.date().isoformat(),
+                "spill_count": 0,
+                "total_volume_gallons": 0.0,
+            },
+        )
+        bucket["spill_count"] += 1
+        volume = _best_volume(record)
+        bucket["total_volume_gallons"] += volume if volume is not None else 0.0
+
+    points = [buckets[key] for key in sorted(buckets.keys())]
+    return {"granularity": granularity, "points": points}
+
+
+def summarize_top_utilities(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for record in records:
+        key = _utility_group_key(record)
+        if not key:
+            continue
+        bucket = buckets.setdefault(
+            key,
+            {
+                "utility_id": record.utility_id or key,
+                "utility_name": record.utility_name or key,
+                "spill_count": 0,
+                "total_volume_gallons": 0.0,
+            },
+        )
+        bucket["spill_count"] += 1
+        volume = _best_volume(record)
+        bucket["total_volume_gallons"] += volume if volume is not None else 0.0
+
+    rows = list(buckets.values())
+    rows.sort(
+        key=lambda row: (
+            -row["total_volume_gallons"],
+            -row["spill_count"],
+            row.get("utility_name") or "",
+        )
+    )
+    return rows
+
+
+def summarize_top_receiving_waters(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for record in records:
+        name = record.receiving_water
+        if not name:
+            continue
+        bucket = buckets.setdefault(
+            name,
+            {"receiving_water_name": name, "spill_count": 0, "total_volume_gallons": 0.0},
+        )
+        bucket["spill_count"] += 1
+        volume = _best_volume(record)
+        bucket["total_volume_gallons"] += volume if volume is not None else 0.0
+
+    rows = list(buckets.values())
+    rows.sort(
+        key=lambda row: (
+            -row["total_volume_gallons"],
+            -row["spill_count"],
+            row.get("receiving_water_name") or "",
+        )
+    )
+    return rows
+
+
+def _pie(entries: List[Dict[str, Any]], total_volume: float, *, key: str) -> List[Dict[str, Any]]:
+    if not total_volume or total_volume <= 0:
+        return []
+    top_entries = entries[:10]
+    pie: List[Dict[str, Any]] = []
+    for entry in top_entries:
+        volume = float(entry.get(key, 0.0) or 0.0)
+        percent = (volume / total_volume) * 100 if total_volume else 0.0
+        pie.append({**entry, "percent_of_total": percent})
+    return pie
+
+
+def build_utility_pie(entries: List[Dict[str, Any]], total_volume: float) -> List[Dict[str, Any]]:
+    return _pie(entries, total_volume, key="total_volume_gallons")
+
+
+def build_receiving_water_pie(
+    entries: List[Dict[str, Any]], total_volume: float
+) -> List[Dict[str, Any]]:
+    return _pie(entries, total_volume, key="total_volume_gallons")
+
+
+def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
+    """Build a dashboard-friendly summary payload."""
+
+    volumes = [vol for vol in (_best_volume(record) for record in records) if vol is not None]
     total_volume = float(sum(volumes)) if volumes else 0.0
     avg_volume = mean(volumes) if volumes else None
     max_volume = max(volumes) if volumes else None
 
     utilities = set()
+    receiving_waters = set()
+    duration_hours: list[float] = []
     for record in records:
         key = _utility_group_key(record)
         if key:
             utilities.add(key)
+        if record.receiving_water:
+            receiving_waters.add(record.receiving_water)
+        dur = _duration_hours(record)
+        if dur is not None:
+            duration_hours.append(dur)
 
     date_values = [record.date_sso_began for record in records if record.date_sso_began]
     date_min = min(date_values).date().isoformat() if date_values else None
     date_max = max(date_values).date().isoformat() if date_values else None
 
-    return {
+    time_series = build_time_series(records)
+    top_utils = summarize_top_utilities(records)
+    top_receiving = summarize_top_receiving_waters(records)
+
+    payload: Dict[str, Any] = {
         "summary_counts": {
             "total_records": len(records),
-            "total_volume": total_volume,
+            "total_volume_gallons": total_volume,
+            "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
             "avg_volume": avg_volume,
             "max_volume": max_volume,
             "distinct_utilities": len(utilities),
+            "distinct_receiving_waters": len(receiving_waters),
             "date_range": {"min": date_min, "max": date_max},
         },
+        "time_series": time_series,
+        "top_utilities": top_utils,
+        "top_utilities_pie": build_utility_pie(top_utils, total_volume),
+        "top_receiving_waters": top_receiving,
+        "receiving_waters_pie": build_receiving_water_pie(
+            top_receiving, total_volume
+        ),
+        # Legacy fields kept for backward compatibility
         "by_month": summarize_by_month(records),
         "by_utility": summarize_by_utility(records),
         "by_volume_bucket": summarize_by_volume_bucket(records),
     }
+
+    return payload
 
 
 def _detect_volume_range_text(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:

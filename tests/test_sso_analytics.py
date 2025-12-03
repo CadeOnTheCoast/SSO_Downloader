@@ -11,9 +11,13 @@ from sso_analytics import (
     summarize_by_utility,
     summarize_by_volume_bucket,
     summarize_overall_volume,
+    summarize_top_receiving_waters,
+    summarize_top_utilities,
     summarize_volume_by_county,
     summarize_volume_by_month,
     summarize_volume_by_utility,
+    build_time_series,
+    build_utility_pie,
     top_spills_by_volume,
     top_utilities_by_volume,
     run_basic_qa,
@@ -151,6 +155,7 @@ def test_volume_bucket_and_dashboard_summary():
             county="Mobile",
             date_sso_began=datetime(2024, 1, 5),
             volume_gallons=500,
+            receiving_water="Bay A",
         ),
         _record(
             sso_id="2",
@@ -159,6 +164,7 @@ def test_volume_bucket_and_dashboard_summary():
             county="Mobile",
             date_sso_began=datetime(2024, 1, 20),
             volume_gallons=5_000,
+            receiving_water="Bay B",
         ),
         _record(
             sso_id="3",
@@ -167,6 +173,7 @@ def test_volume_bucket_and_dashboard_summary():
             county="Baldwin",
             date_sso_began=datetime(2024, 2, 1),
             volume_gallons=150_000,
+            receiving_water="Bay A",
         ),
         _record(
             sso_id="4",
@@ -194,7 +201,51 @@ def test_volume_bucket_and_dashboard_summary():
     summary = build_dashboard_summary(records)
     assert summary["summary_counts"]["total_records"] == 4
     assert summary["summary_counts"]["distinct_utilities"] == 2
+    assert summary["summary_counts"]["distinct_receiving_waters"] == 2
     assert summary["summary_counts"]["date_range"]["min"] == "2024-01-05"
+    assert summary["summary_counts"]["total_volume_gallons"] == 155500.0
     assert summary["by_volume_bucket"] == by_bucket
+
+
+def test_time_series_granularity_and_top_lists():
+    records = [
+        _record(
+            sso_id="1",
+            utility_id="U1",
+            utility_name="Alpha",
+            receiving_water="River A",
+            date_sso_began=datetime(2021, 1, 1),
+            volume_gallons=1000,
+        ),
+        _record(
+            sso_id="2",
+            utility_id="U1",
+            utility_name="Alpha",
+            receiving_water="River B",
+            date_sso_began=datetime(2021, 3, 1),
+            volume_gallons=2000,
+        ),
+        _record(
+            sso_id="3",
+            utility_id="U2",
+            utility_name="Beta",
+            receiving_water="River A",
+            date_sso_began=datetime(2022, 1, 5),
+            volume_gallons=4000,
+        ),
+    ]
+
+    series = build_time_series(records)
+    assert series["granularity"] == "year"
+    assert [point["period_label"] for point in series["points"]] == ["2021", "2022"]
+
+    top_utils = summarize_top_utilities(records)
+    assert top_utils[0]["utility_id"] == "U2"
+    assert top_utils[0]["total_volume_gallons"] == 4000
+
+    top_receiving = summarize_top_receiving_waters(records)
+    assert top_receiving[0]["receiving_water_name"] == "River A"
+    pie = build_utility_pie(top_utils, total_volume=6000)
+    assert round(pie[0]["percent_of_total"], 2) == 66.67
 
 

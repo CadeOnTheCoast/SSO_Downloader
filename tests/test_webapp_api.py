@@ -18,11 +18,22 @@ from webapp import api
 class DummyClient:
     def __init__(self, records: List[dict]):
         self.records = records
+        self.utilities = [
+            {"id": "AL0000001", "name": "Example Utility"},
+            {"id": "AL0000002", "name": "Second Utility"},
+        ]
+        self.counties = ["Mobile", "Baldwin"]
 
     def fetch_ssos(self, query=None, limit=None, **kwargs):  # pragma: no cover - simple stub
         if limit is not None:
             return self.records[:limit]
         return list(self.records)
+
+    def list_utilities(self):  # pragma: no cover - simple stub
+        return self.utilities
+
+    def list_counties(self):  # pragma: no cover - simple stub
+        return self.counties
 
 
 def _set_client_override(records: List[dict]) -> TestClient:
@@ -114,10 +125,10 @@ def test_dashboard_summary_returns_expected_payload():
     assert response.status_code == 200
     payload = response.json()
     assert payload["summary_counts"]["total_records"] == 2
-    assert payload["summary_counts"]["total_volume"] == 150.0
-    assert payload["by_month"]
-    assert payload["by_utility"]
-    assert payload["by_volume_bucket"]
+    assert payload["summary_counts"]["total_volume_gallons"] == 150.0
+    assert payload["time_series"]["granularity"] in ("none", "month", "year")
+    assert payload["top_utilities"]
+    assert payload["top_receiving_waters"] == []
 
 
 def test_api_ssos_returns_items_with_limit():

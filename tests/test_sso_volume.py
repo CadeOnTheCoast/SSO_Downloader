@@ -40,7 +40,7 @@ def test_dashboard_summary_uses_estimated_volume_upper_bound():
     records = normalize_sso_records(raw_records)
     summary = build_dashboard_summary(records)
 
-    assert summary["summary_counts"]["total_volume"] == 550_000
+    assert summary["summary_counts"]["total_volume_gallons"] == 550_000
     assert summary["summary_counts"]["max_volume"] == 500_000
     assert summary["summary_counts"]["avg_volume"] == pytest.approx(183_333.3333, rel=1e-6)
     assert all(item.get("total_volume") for item in summary["by_month"])

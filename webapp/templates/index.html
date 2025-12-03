@@ -2,130 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>SSO Downloader</title>
+    <title>SSO Downloader Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
     <style>
-        body { font-family: Arial, sans-serif; margin: 2rem; }
-        label { display: block; margin-top: 1rem; }
-        select, input { padding: 0.5rem; width: 240px; }
-        button { margin-top: 1rem; padding: 0.5rem 1rem; }
-        #summary { margin-top: 1.5rem; white-space: pre-wrap; border: 1px solid #ddd; padding: 1rem; }
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --border: #e5e7eb;
+            --muted: #6b7280;
+            --primary: #2563eb;
+            --accent: #0ea5e9;
+        }
+        body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: var(--bg); color: #0f172a; margin: 0; }
+        header { background: #0f172a; color: #fff; padding: 1.2rem 1.5rem; }
+        header h1 { margin: 0; font-size: 1.45rem; }
+        header p { margin: 0.35rem 0 0; color: rgba(255,255,255,0.8); }
+        main { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+        .layout { display: grid; grid-template-columns: 280px 1fr; gap: 1rem; align-items: start; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .panel h2 { margin: 0 0 0.65rem; font-size: 1.05rem; }
+        label { display: block; margin-top: 0.75rem; font-weight: 600; font-size: 0.95rem; }
+        input, select { width: 100%; padding: 0.55rem; margin-top: 0.35rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
+        button { padding: 0.65rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; }
+        #preview { background: var(--primary); color: #fff; }
+        #download { background: #047857; color: #fff; }
+        .button-row { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+        .status { margin-top: 0.75rem; min-height: 1.2rem; color: #b91c1c; font-weight: 700; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+        .card { background: var(--panel); padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .card-title { color: var(--muted); font-size: 0.85rem; }
+        .card-value { font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem; }
+        .card-sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+        .chart-empty { color: var(--muted); font-style: italic; text-align: center; padding: 1.25rem 0.5rem; }
+        .section-title { font-size: 1.05rem; margin: 1rem 0 0.5rem; font-weight: 800; }
+        .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 0.6rem; border-bottom: 1px solid var(--border); text-align: left; }
+        th { background: #f3f4f6; font-weight: 700; cursor: pointer; user-select: none; }
+        th.sort-asc::after { content: " \25B2"; }
+        th.sort-desc::after { content: " \25BC"; }
+        .muted { color: var(--muted); }
+        .equivalents { line-height: 1.5; }
+        .hidden { display: none; }
+        .searchable { position: relative; }
+        .searchable input { padding-right: 2rem; }
+        .clear-btn { position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: var(--muted); font-weight: 800; }
+        @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <h1>SSO Downloader</h1>
-    <p>Choose filters to download sanitary sewer overflow records as CSV.</p>
+    <header>
+        <h1>Sanitary Sewer Overflow Dashboard</h1>
+        <p>Preview Alabama SSO activity with filters, charts, and CSV export.</p>
+    </header>
+    <main>
+        <div class="layout">
+            <aside class="panel" aria-label="Filters">
+                <h2>Filters</h2>
+                <div class="searchable">
+                    <label for="utility-search">Utility</label>
+                    <input id="utility-search" type="text" list="utility-options" placeholder="Search utilities" />
+                    <datalist id="utility-options"></datalist>
+                    <button class="clear-btn" type="button" data-target="utility-search" aria-label="Clear utility">×</button>
+                </div>
+                <div class="searchable">
+                    <label for="county-search">County</label>
+                    <input id="county-search" type="text" list="county-options" placeholder="Search counties" />
+                    <datalist id="county-options"></datalist>
+                    <button class="clear-btn" type="button" data-target="county-search" aria-label="Clear county">×</button>
+                </div>
+                <label for="start_date">Start date</label>
+                <input type="date" id="start_date" />
+                <label for="end_date">End date</label>
+                <input type="date" id="end_date" />
+                <div class="button-row">
+                    <button type="button" id="preview">Preview summary</button>
+                    <button type="button" id="download">Download CSV</button>
+                </div>
+                <div class="status" id="status" aria-live="polite"></div>
+            </aside>
+            <section>
+                <div id="empty-message" class="panel hidden" aria-live="polite">No results found for the selected filters.</div>
+                <div id="dashboard" class="hidden" aria-live="polite">
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-title">Total spills</div>
+                            <div class="card-value" id="card-total-spills">–</div>
+                            <div class="card-sub" id="card-date-range">&nbsp;</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">Total gallons spilled</div>
+                            <div class="card-value" id="card-total-volume">–</div>
+                            <div class="card-sub">Distinct utilities: <span id="card-distinct-utils">–</span></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">Total duration (hrs)</div>
+                            <div class="card-value" id="card-total-duration">–</div>
+                            <div class="card-sub">Receiving waters: <span id="card-distinct-waters">–</span></div>
+                        </div>
+                        <div class="card" id="equivalents-card">
+                            <div class="card-title">How much is that?</div>
+                            <div class="equivalents" id="equivalents-text">–</div>
+                        </div>
+                    </div>
 
-    <form id="filters-form">
-        <label>
-            Utility
-            <select id="utility">
-                <option value="">-- any utility --</option>
-            </select>
-        </label>
+                    <div class="charts">
+                        <div class="panel">
+                            <h2>Spills over time</h2>
+                            <div id="chart-count-empty" class="chart-empty" hidden>No data for the selected range.</div>
+                            <canvas id="chart-count"></canvas>
+                        </div>
+                        <div class="panel">
+                            <h2>Total volume over time</h2>
+                            <div id="chart-volume-empty" class="chart-empty" hidden>No data for the selected range.</div>
+                            <canvas id="chart-volume"></canvas>
+                        </div>
+                    </div>
 
-        <label>
-            County
-            <select id="county">
-                <option value="">-- any county --</option>
-            </select>
-        </label>
+                    <h2 class="section-title">Top receiving waters</h2>
+                    <div class="two-col">
+                        <div class="panel table-container">
+                            <table id="receiving-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="receiving_water_name">Receiving water</th>
+                                        <th data-sort="total_volume_gallons">Total volume</th>
+                                        <th data-sort="spill_count">Spills</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="panel">
+                            <h2 id="pie-title">Volume by receiving water</h2>
+                            <div id="pie-empty" class="chart-empty" hidden>No volume data to chart.</div>
+                            <canvas id="receiving-pie"></canvas>
+                        </div>
+                    </div>
 
-        <label>
-            Start date
-            <input type="date" id="start_date" />
-        </label>
-
-        <label>
-            End date
-            <input type="date" id="end_date" />
-        </label>
-
-        <div>
-            <button type="button" id="download">Download CSV</button>
-            <button type="button" id="preview">Preview summary</button>
+                    <h2 class="section-title">Top utilities</h2>
+                    <div class="two-col">
+                        <div class="panel table-container">
+                            <table id="utility-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="utility_name">Utility</th>
+                                        <th data-sort="spill_count">Spills</th>
+                                        <th data-sort="total_volume_gallons">Total volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="panel">
+                            <h2>Volume share</h2>
+                            <div id="utility-pie-empty" class="chart-empty" hidden>No volume data to chart.</div>
+                            <canvas id="utility-pie"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-    </form>
-
-    <div id="summary" aria-live="polite"></div>
-
-    <script>
-        async function loadFilters() {
-            let data;
-            try {
-                const response = await fetch('/api/options');
-                data = await response.json();
-            } catch (err) {
-                const response = await fetch('/filters');
-                data = await response.json();
-            }
-
-            const utilitySelect = document.getElementById('utility');
-            const countySelect = document.getElementById('county');
-
-            (data.utilities || []).forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = `${item.name} (${item.id})`;
-                utilitySelect.appendChild(option);
-            });
-
-            (data.counties || []).forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                countySelect.appendChild(option);
-            });
-        }
-
-        function buildQueryParams() {
-            const params = new URLSearchParams();
-            const utility = document.getElementById('utility').value;
-            const county = document.getElementById('county').value;
-            const startDate = document.getElementById('start_date').value;
-            const endDate = document.getElementById('end_date').value;
-
-            if (utility) params.set('utility_id', utility);
-            if (county) params.set('county', county);
-            if (startDate) params.set('start_date', startDate);
-            if (endDate) params.set('end_date', endDate);
-
-            return params;
-        }
-
-        function ensureFilters(params) {
-            return params.has('utility_id') || params.has('county') || params.has('start_date') || params.has('end_date');
-        }
-
-        document.getElementById('download').addEventListener('click', () => {
-            const params = buildQueryParams();
-            if (!ensureFilters(params)) {
-                alert('Please select at least one filter (utility, county, or date range).');
-                return;
-            }
-            window.location.href = `/api/ssos.csv?${params.toString()}`;
-        });
-
-        document.getElementById('preview').addEventListener('click', async () => {
-            const params = buildQueryParams();
-            const summaryEl = document.getElementById('summary');
-            summaryEl.textContent = 'Loading summary...';
-            if (!ensureFilters(params)) {
-                summaryEl.textContent = 'Please add at least one filter to preview a summary.';
-                return;
-            }
-            let response = await fetch(`/api/ssos/summary?${params.toString()}`);
-            if (!response.ok) {
-                response = await fetch(`/summary?${params.toString()}`);
-            }
-            if (!response.ok) {
-                summaryEl.textContent = 'Failed to load summary. Please check your filters.';
-                return;
-            }
-            const data = await response.json();
-            summaryEl.textContent = JSON.stringify(data, null, 2);
-        });
-
-        loadFilters();
-    </script>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', path='preview_dashboard.js') }}"></script>
 </body>
 </html>

@@ -138,9 +138,10 @@ def test_dashboard_summary_returns_expected_payload():
     payload = response.json()
     assert payload["summary_counts"]["total_records"] == 2
     assert payload["summary_counts"]["total_volume_gallons"] == 150.0
+    assert payload["summary_counts"]["total_volume"] == 150.0
     assert payload["time_series"]["granularity"] in ("none", "month", "year")
     assert payload["top_utilities"]
-    assert payload["top_receiving_waters"] == []
+    assert payload["by_receiving_water"]
 
 
 def test_api_ssos_returns_items_with_limit():

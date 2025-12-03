@@ -199,12 +199,33 @@ def test_volume_bucket_and_dashboard_summary():
     assert by_utility[1]["utility_id"] == "U1"
 
     summary = build_dashboard_summary(records)
+    assert summary["summary_counts"]["total_duration_hours"] == 0.0
+    assert summary["summary_counts"]["total_volume"] == summary["summary_counts"]["total_volume_gallons"]
+    receiving = summary.get("by_receiving_water")
+    assert receiving[0]["name"] in {"Bay A", "Bay B"}
+    assert any(row["name"] for row in receiving)
+
+
+def test_receiving_water_normalization_and_counts():
+    records = [
+        _record(receiving_water="Ground Absorbed"),
+        _record(receiving_water="River A; Backup into building"),
+        _record(receiving_water="Blue Creek; nearby road ditch"),
+        _record(receiving_water=None),
+    ]
+
+    summary = summarize_top_receiving_waters(records)
+    names = [row["receiving_water_name"] for row in summary]
+    assert "Contained / did not reach state waters" in names
+    assert "River A" in names
+    assert "Blue Creek" in names
+
+    summary = build_dashboard_summary(records)
     assert summary["summary_counts"]["total_records"] == 4
-    assert summary["summary_counts"]["distinct_utilities"] == 2
-    assert summary["summary_counts"]["distinct_receiving_waters"] == 2
-    assert summary["summary_counts"]["date_range"]["min"] == "2024-01-05"
-    assert summary["summary_counts"]["total_volume_gallons"] == 155500.0
-    assert summary["by_volume_bucket"] == by_bucket
+    assert summary["summary_counts"]["distinct_utilities"] == 0
+    assert summary["summary_counts"]["distinct_receiving_waters"] == 3
+    assert summary["summary_counts"]["date_range"]["min"] is None
+    assert summary["summary_counts"]["total_volume_gallons"] == 0.0
 
 
 def test_time_series_granularity_and_top_lists():

@@ -78,6 +78,9 @@ This module is intended as a thin shell that future dashboards can extend withou
 Module I layers a human-friendly dashboard on top of the FastAPI app and analytics helpers.
 
 - **Run locally:** `uvicorn webapp.api:app --reload` and open `http://127.0.0.1:8000/dashboard`.
+- **Highlights:** headline stat cards now narrate total spills, gallons, and duration using the full ArcGIS dataset (with pagination under the hood); receiving-water names are normalized for charts/tables; utility filtering is permittee-based and county filtering uses the full county list; volume-share tooltips keep labels aligned with data.
+- **Controls:** searchable utility and county selectors populate from `/api/options`, and the buttons read “Summarize” (refresh the view) and “Download the data” (CSV).
+- **Notes:** Long, multi-year date ranges may take extra time to paginate through ArcGIS, but the summary will reflect all returned pages rather than the first 5,000 rows.
 - **Features:**
   - Filters for utility, county, and date range (with optional record limit for the table).
   - Summary cards for totals, distinct utilities, and volume statistics with a visible date range.

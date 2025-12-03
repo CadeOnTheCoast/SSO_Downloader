@@ -53,6 +53,34 @@ VOLUME_BUCKETS: List[tuple[float, Optional[float]]] = [
     (100_000, None),
 ]
 
+RECEIVING_WATER_KEYWORDS = (
+    "river",
+    "creek",
+    "bay",
+    "branch",
+    "lake",
+    "pond",
+    "gully",
+    "lagoon",
+    "swamp",
+    "stream",
+    "ditch",
+    "canal",
+    "cove",
+    "slough",
+    "harbor",
+)
+
+CONTAINED_LABEL = "Contained / did not reach state waters"
+CONTAINED_PHRASES = {
+    "ground absorbed",
+    "backup into building",
+    "backup into building/residence",
+    "contained",
+    "did not reach us waters",
+    "did not reach waters",
+}
+
 
 @dataclass
 class QAIssue:
@@ -69,6 +97,29 @@ def _usable_volume(record: SSORecord) -> Optional[float]:
     if record.volume_gallons < 0:
         return None
     return record.volume_gallons
+
+
+def _normalize_receiving_water_name(raw_value: Optional[str]) -> Optional[str]:
+    if not raw_value:
+        return None
+    value = str(raw_value).strip()
+    if not value:
+        return None
+
+    parts = [part.strip() for part in value.split(";") if part and part.strip()]
+    if not parts:
+        parts = [value]
+
+    for part in parts:
+        lower_part = part.lower()
+        if any(keyword in lower_part for keyword in RECEIVING_WATER_KEYWORDS):
+            return part
+
+    lower_value = value.lower()
+    if any(phrase in lower_value for phrase in CONTAINED_PHRASES):
+        return CONTAINED_LABEL
+
+    return parts[0] if parts else value
 
 
 def _best_volume(record: SSORecord) -> Optional[float]:
@@ -439,16 +490,23 @@ def summarize_top_utilities(records: Sequence[SSORecord]) -> List[Dict[str, Any]
 
 
 def summarize_top_receiving_waters(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
+    return summarize_by_receiving_water(records)
+
+
+def summarize_by_receiving_water(
+    records: Sequence[SSORecord], *, top_n: Optional[int] = None
+) -> List[Dict[str, Any]]:
     buckets: dict[str, dict[str, Any]] = {}
+
     for record in records:
-        name = record.receiving_water
-        if not name:
-            continue
+        name = _normalize_receiving_water_name(record.receiving_water)
+        label = name or "Unknown"
         bucket = buckets.setdefault(
-            name,
+            label,
             {
-                "receiving_water": name,
-                "receiving_water_name": name,
+                "name": label,
+                "receiving_water": label,
+                "receiving_water_name": label,
                 "spill_count": 0,
                 "total_volume_gallons": 0.0,
             },
@@ -465,6 +523,8 @@ def summarize_top_receiving_waters(records: Sequence[SSORecord]) -> List[Dict[st
             row.get("receiving_water_name") or "",
         )
     )
+    if top_n is not None:
+        rows = rows[:top_n]
     return rows
 
 
@@ -518,12 +578,14 @@ def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
     time_series = build_time_series(records)
     top_utils = summarize_top_utilities(records)
     top_receiving = summarize_top_receiving_waters(records)
+    by_receiving_water = summarize_by_receiving_water(records, top_n=10)
 
     payload: Dict[str, Any] = {
         "summary_counts": {
             "total_records": len(records),
             "total_spills": len(records),
             "total_volume_gallons": total_volume,
+            "total_volume": total_volume,
             "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
             "avg_volume": avg_volume,
             "max_volume": max_volume,
@@ -538,6 +600,14 @@ def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
         "receiving_waters_pie": build_receiving_water_pie(
             top_receiving, total_volume
         ),
+        "by_receiving_water": [
+            {
+                "name": item.get("name") or item.get("receiving_water_name"),
+                "total_volume": item.get("total_volume_gallons", 0.0),
+                "spills": item.get("spill_count", 0),
+            }
+            for item in by_receiving_water
+        ],
         # Legacy fields kept for backward compatibility
         "by_month": summarize_by_month(records),
         "by_utility": summarize_by_utility(records),

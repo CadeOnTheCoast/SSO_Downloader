@@ -96,13 +96,24 @@ class SSOQueryParams(BaseModel):
         utility_id = self.permit or self.utility_id
 
         permit_ids: Optional[list[str]] = None
+        def _permits_from_map(value: str) -> Optional[list[str]]:
+            if not permit_map or not value:
+                return None
+            entry = permit_map.get(value.lower())
+            if entry and entry.get("permits"):
+                return list(entry["permits"])
+            for details in permit_map.values():
+                permits = details.get("permits") or []
+                if value in permits:
+                    return list(permits)
+            return None
+
         if utility_id:
-            permit_ids = [utility_id]
+            permit_ids = _permits_from_map(utility_id) or [utility_id]
         elif permit_map and self.utility_name:
-            entry = permit_map.get(self.utility_name.lower())
-            permits = entry.get("permits") if entry else None
+            permits = _permits_from_map(self.utility_name)
             if permits:
-                permit_ids = list(permits)
+                permit_ids = permits
 
         return SSOQuery(
             utility_id=None if permit_ids else self.utility_id,
@@ -135,11 +146,8 @@ def health_check() -> dict[str, str]:
 
 
 def _load_options(client: SSOClient) -> dict[str, object]:
-    utilities = DEFAULT_UTILITIES
-    permittees = [
-        {"id": item["id"], "name": item["name"], "permits": [item["id"]]}
-        for item in DEFAULT_UTILITIES
-    ]
+    utilities: list[dict[str, object]] = []
+    permittees: list[dict[str, object]] = []
     counties = list(DEFAULT_COUNTIES)
 
     try:
@@ -147,7 +155,11 @@ def _load_options(client: SSOClient) -> dict[str, object]:
         if fresh_permittees:
             permittees = fresh_permittees
             utilities = [
-                {"id": item.get("id"), "name": item.get("name")}
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "permits": item.get("permits", []),
+                }
                 for item in fresh_permittees
             ]
     except Exception:
@@ -265,10 +277,8 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    safe_limit = params.bounded_limit(default=5000, maximum=20000)
-
     try:
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
+        raw_records = client.fetch_ssos(query=query, limit=params.limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -313,10 +323,8 @@ def series_by_date(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    safe_limit = params.bounded_limit(default=5000, maximum=10000)
-
     try:
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
+        raw_records = client.fetch_ssos(query=query, limit=params.limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -338,10 +346,8 @@ def series_by_utility(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    safe_limit = params.bounded_limit(default=5000, maximum=10000)
-
     try:
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
+        raw_records = client.fetch_ssos(query=query, limit=params.limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

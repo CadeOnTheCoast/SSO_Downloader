@@ -50,8 +50,15 @@
 
     <script>
         async function loadFilters() {
-            const response = await fetch('/filters');
-            const data = await response.json();
+            let data;
+            try {
+                const response = await fetch('/api/options');
+                data = await response.json();
+            } catch (err) {
+                const response = await fetch('/filters');
+                data = await response.json();
+            }
+
             const utilitySelect = document.getElementById('utility');
             const countySelect = document.getElementById('county');
 
@@ -95,7 +102,7 @@
                 alert('Please select at least one filter (utility, county, or date range).');
                 return;
             }
-            window.location.href = `/download?${params.toString()}`;
+            window.location.href = `/api/ssos.csv?${params.toString()}`;
         });
 
         document.getElementById('preview').addEventListener('click', async () => {
@@ -106,7 +113,10 @@
                 summaryEl.textContent = 'Please add at least one filter to preview a summary.';
                 return;
             }
-            const response = await fetch(`/summary?${params.toString()}`);
+            let response = await fetch(`/api/ssos/summary?${params.toString()}`);
+            if (!response.ok) {
+                response = await fetch(`/summary?${params.toString()}`);
+            }
             if (!response.ok) {
                 summaryEl.textContent = 'Failed to load summary. Please check your filters.';
                 return;

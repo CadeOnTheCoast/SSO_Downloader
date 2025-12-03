@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>SSO Dashboard</title>
+    <title>Alabama Sewage Spills Dashboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
     <style>
         :root {
@@ -14,8 +14,8 @@
         }
         body { font-family: "Inter", system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: #0f172a; }
         header { background: #0f172a; color: #fff; padding: 1.25rem 1.5rem; }
-        header h1 { margin: 0; font-size: 1.5rem; }
-        header p { margin: 0.35rem 0 0; color: rgba(255,255,255,0.8); }
+        header h1 { margin: 0; font-size: 1.6rem; }
+        header p { margin: 0.35rem 0 0; color: rgba(255,255,255,0.8); font-size: 1rem; }
         nav { margin-top: 0.75rem; display: flex; gap: 1rem; align-items: center; }
         nav a { color: #bfdbfe; text-decoration: none; font-weight: 600; }
         nav a:hover { color: #fff; }
@@ -30,11 +30,11 @@
         #download-csv { background: #047857; color: #fff; }
         .button-row { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
         .status { margin-top: 0.75rem; color: #b91c1c; min-height: 1.1rem; font-weight: 600; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; }
-        .card { background: var(--panel); padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .card-title { color: var(--muted); font-size: 0.85rem; }
-        .card-value { font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem; }
-        .card-sub { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.9rem; margin-top: 1rem; }
+        .card { background: var(--panel); padding: 1rem 1.1rem; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: grid; gap: 0.4rem; }
+        .card-title { color: var(--muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em; }
+        .card-value { font-size: 2rem; font-weight: 800; margin-top: 0.15rem; }
+        .card-sub { color: var(--muted); font-size: 0.95rem; line-height: 1.35; }
         .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .chart-empty { color: var(--muted); font-style: italic; text-align: center; padding: 1.25rem 0.5rem; }
         .table-container { overflow-x: auto; margin-top: 1rem; }
@@ -48,8 +48,8 @@
 </head>
 <body>
     <header>
-        <h1>Sanitary Sewer Overflow Dashboard</h1>
-        <p>Filters, headline stats, trend charts, and a preview table powered by the SSO API.</p>
+        <h1>Alabama Sewage Spills Dashboard</h1>
+        <p>Find out how much poop is polluting Alabama waterways.</p>
         <nav>
             <a href="/dashboard">Dashboard</a>
             <a href="/">Download</a>
@@ -61,10 +61,12 @@
             <aside class="panel" aria-label="Filter panel">
                 <h2>Filters</h2>
                 <label for="utility-select">Utility</label>
+                <input type="text" id="utility-search" placeholder="Search utility" />
                 <select id="utility-select">
                     <option value="">Any utility</option>
                 </select>
                 <label for="county-select">County</label>
+                <input type="text" id="county-search" placeholder="Search county" />
                 <select id="county-select">
                     <option value="">Any county</option>
                 </select>
@@ -75,8 +77,8 @@
                 <label for="record-limit">Max records (table only)</label>
                 <input type="number" id="record-limit" min="1" max="1000" value="200" />
                 <div class="button-row">
-                    <button id="apply-filters">Apply filters</button>
-                    <button id="download-csv">Download CSV</button>
+                    <button id="apply-filters">Summarize</button>
+                    <button id="download-csv">Download the data</button>
                 </div>
                 <div class="status" id="status" aria-live="polite"></div>
             </aside>
@@ -84,18 +86,23 @@
                 <div class="cards" aria-live="polite">
                     <div class="card">
                         <div class="card-title">Total spills</div>
-                        <div class="card-value" id="summary-total-count">–</div>
-                        <div class="card-sub" id="summary-date-range">&nbsp;</div>
+                        <div class="card-value" id="card-total-spills">–</div>
+                        <div class="card-sub" id="card-total-spills-text">&nbsp;</div>
                     </div>
                     <div class="card">
-                        <div class="card-title">Total volume (gal)</div>
-                        <div class="card-value" id="summary-total-volume">–</div>
-                        <div class="card-sub">Distinct utilities: <span id="summary-distinct-utilities">–</span></div>
+                        <div class="card-title">Total gallons</div>
+                        <div class="card-value" id="card-total-volume">–</div>
+                        <div class="card-sub" id="card-total-volume-text">&nbsp;</div>
                     </div>
                     <div class="card">
-                        <div class="card-title">Average volume (gal)</div>
-                        <div class="card-value" id="summary-avg-volume">–</div>
-                        <div class="card-sub">Max volume: <span id="summary-max-volume">–</span></div>
+                        <div class="card-title">Total duration</div>
+                        <div class="card-value" id="card-total-duration">–</div>
+                        <div class="card-sub" id="card-total-duration-text">&nbsp;</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Raw sewage equivalence</div>
+                        <div class="card-value" id="card-equivalence">–</div>
+                        <div class="card-sub" id="card-equivalence-text">&nbsp;</div>
                     </div>
                 </div>
                 <div class="charts">
@@ -110,11 +117,37 @@
                         <canvas id="utility-chart" aria-label="Volume by utility"></canvas>
                     </div>
                     <div class="panel">
+                        <h2>Volume share (top utilities)</h2>
+                        <div id="volume-share-empty" class="chart-empty" hidden>No data for the selected filters.</div>
+                        <canvas id="volume-share-chart" aria-label="Volume share by utility"></canvas>
+                    </div>
+                    <div class="panel">
                         <h2>Spills by volume bucket</h2>
                         <div id="bucket-empty" class="chart-empty" hidden>No data for the selected filters.</div>
                         <canvas id="bucket-chart" aria-label="Volume bucket distribution"></canvas>
                     </div>
+                    <div class="panel">
+                        <h2>Volume by receiving water</h2>
+                        <div id="receiving-empty" class="chart-empty" hidden>No data for the selected filters.</div>
+                        <canvas id="receiving-chart" aria-label="Volume by receiving water"></canvas>
+                    </div>
                 </div>
+                <section class="panel table-container" aria-live="polite">
+                    <div class="table-meta">
+                        <h2>Top receiving waters</h2>
+                        <div class="pill">Volume and spill counts</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Receiving water</th>
+                                <th>Total volume (gal)</th>
+                                <th>Spills</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiving-table-body"></tbody>
+                    </table>
+                </section>
                 <section class="panel table-container" aria-live="polite">
                     <div class="table-meta">
                         <h2>Matching records</h2>

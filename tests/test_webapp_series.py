@@ -50,7 +50,7 @@ def test_series_by_date_returns_points_and_enforces_limit():
     assert "points" in payload
     assert payload["points"][0]["date"] == "2024-01-01"
     assert payload["points"][0]["count"] == 2
-    assert dummy.last_limit == 5000  # default bounded limit
+    assert dummy.last_limit is None
 
 
 def test_series_by_utility_returns_bars():
@@ -81,7 +81,7 @@ def test_series_by_utility_returns_bars():
     assert "bars" in payload
     labels = [bar["label"] for bar in payload["bars"]]
     assert "Utility A" in labels
-    assert dummy.last_limit == 10000  # capped at maximum
+    assert dummy.last_limit == 20000
 
 
 def test_records_endpoint_returns_serialized_rows():
@@ -114,5 +114,5 @@ def test_dashboard_template_renders():
     _clear_overrides()
 
     assert response.status_code == 200
-    assert "summary-total-count" in response.text
+    assert "card-total-spills" in response.text
     assert "time-series-chart" in response.text

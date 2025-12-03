@@ -1,6 +1,7 @@
 """SSO ArcGIS client for downloading sanitary sewer overflow records."""
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -19,6 +20,9 @@ from sso_schema import (
 
 DEFAULT_BASE_URL = "https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query"
 DEFAULT_PAGE_SIZE = 2000
+MAX_REASONABLE_RECORDS = 250_000
+
+logger = logging.getLogger(__name__)
 
 
 class SSOClientError(RuntimeError):
@@ -53,9 +57,11 @@ class SSOClient:
         self.api_key = api_key or config.api_key
         self.timeout = timeout if timeout is not None else config.timeout
         self.session = session or requests.Session()
+        self._supports_pagination: Optional[bool] = None
+        self._max_record_count: Optional[int] = None
 
-    def _get(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        response = self.session.get(self.base_url, params=params, timeout=self.timeout)
+    def _get(self, params: Dict[str, Any], *, url: Optional[str] = None) -> Dict[str, Any]:
+        response = self.session.get(url or self.base_url, params=params, timeout=self.timeout)
         if not response.ok:
             raise SSOClientError(
                 f"Request failed with status {response.status_code}: {response.text[:200]}"
@@ -64,6 +70,27 @@ class SSOClient:
             return response.json()
         except ValueError as exc:  # pragma: no cover - defensive
             raise SSOClientError("Failed to decode JSON response") from exc
+
+    def _load_layer_metadata(self) -> tuple[Optional[bool], Optional[int]]:
+        if self._supports_pagination is not None and self._max_record_count is not None:
+            return self._supports_pagination, self._max_record_count
+
+        meta_url = self.base_url
+        if meta_url.endswith("/query"):
+            meta_url = meta_url[: -len("/query")]
+
+        try:
+            data = self._get({"f": "json"}, url=meta_url)
+        except Exception:  # pragma: no cover - defensive
+            return self._supports_pagination, self._max_record_count
+
+        self._supports_pagination = bool(data.get("supportsPagination"))
+        try:
+            self._max_record_count = int(data.get("maxRecordCount")) if data.get("maxRecordCount") else None
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            self._max_record_count = None
+
+        return self._supports_pagination, self._max_record_count
 
     def fetch_ssos(
         self,
@@ -95,14 +122,19 @@ class SSOClient:
         if extra_params and not query_obj.extra_params:
             params.update(extra_params)
 
+        supports_pagination, max_record_count = self._load_layer_metadata()
+
         offset = 0
         page_size = int(params.pop("resultRecordCount", DEFAULT_PAGE_SIZE))
+        if max_record_count:
+            page_size = min(page_size, int(max_record_count))
         records: List[Dict[str, Any]] = []
 
         while True:
             page_params = dict(params)
-            page_params["resultOffset"] = offset
-            page_params["resultRecordCount"] = page_size
+            if supports_pagination:
+                page_params["resultOffset"] = offset
+                page_params["resultRecordCount"] = page_size
             data = self._get(page_params)
 
             feature_list: List[Dict[str, Any]] = list(data.get("features", []) or [])
@@ -119,6 +151,20 @@ class SSOClient:
                     return records[:limit]
 
             offset += len(feature_list)
+
+            if limit is not None and len(records) >= limit:
+                return records[:limit]
+
+            if len(feature_list) < page_size:
+                break
+
+            if len(records) > MAX_REASONABLE_RECORDS:
+                logger.warning(
+                    "Fetched %s records which exceeds the expected upper bound.", len(records)
+                )
+
+            if not supports_pagination:
+                break
 
         return records
 

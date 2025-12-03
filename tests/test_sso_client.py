@@ -59,6 +59,7 @@ def test_build_where_clause():
 
 def test_fetch_ssos_paginates_and_applies_limit():
     responses = [
+        DummyResponse({"supportsPagination": True, "maxRecordCount": 2}),
         DummyResponse({
             "features": [
                 {"attributes": {"id": 1}, "geometry": {"x": 1, "y": 2}},
@@ -78,13 +79,15 @@ def test_fetch_ssos_paginates_and_applies_limit():
 
     assert len(records) == 2
     assert records[0]["id"] == 1
-    assert session.calls[0]["params"]["resultOffset"] == 0
+    assert session.calls[1]["params"]["resultOffset"] == 0
     # Limit should stop further pagination once enough records are collected
-    assert len(session.calls) == 1
+    assert len(session.calls) == 2
 
 
 def test_fetch_ssos_handles_http_error():
-    session = MockSession([DummyResponse({}, status_code=500, text="boom")])
+    session = MockSession(
+        [DummyResponse({"supportsPagination": True}), DummyResponse({}, status_code=500, text="boom")]
+    )
     client = SSOClient(base_url="http://example.com", session=session)
 
     with pytest.raises(SSOClientError):
@@ -92,7 +95,7 @@ def test_fetch_ssos_handles_http_error():
 
 
 def test_fetch_ssos_invalid_json():
-    session = MockSession([DummyResponse(ValueError("bad json"))])
+    session = MockSession([DummyResponse({"supportsPagination": True}), DummyResponse(ValueError("bad json"))])
     client = SSOClient(base_url="http://example.com", session=session)
 
     with pytest.raises(SSOClientError):
@@ -101,11 +104,12 @@ def test_fetch_ssos_invalid_json():
 
 def test_fetch_ssos_accepts_query_object():
     responses = [
+        DummyResponse({"supportsPagination": True}),
         DummyResponse({
             "features": [
                 {"attributes": {"id": 1}, "geometry": {"x": 1, "y": 2}},
             ]
-        })
+        }),
     ]
     session = MockSession(responses)
     client = SSOClient(base_url="http://example.com", session=session)
@@ -114,5 +118,34 @@ def test_fetch_ssos_accepts_query_object():
     records = client.fetch_ssos(query=query, limit=1)
 
     assert len(records) == 1
-    assert "where" in session.calls[0]["params"]
-    assert "county = 'Mobile'" in session.calls[0]["params"]["where"]
+    assert "where" in session.calls[1]["params"]
+    assert "county = 'Mobile'" in session.calls[1]["params"]["where"]
+
+
+def test_fetch_ssos_collects_all_pages_when_no_limit():
+    responses = [
+        DummyResponse({"supportsPagination": True, "maxRecordCount": 2}),
+        DummyResponse(
+            {
+                "features": [
+                    {"attributes": {"id": 1}, "geometry": {"x": 1, "y": 1}},
+                    {"attributes": {"id": 2}, "geometry": {"x": 2, "y": 2}},
+                ]
+            }
+        ),
+        DummyResponse(
+            {
+                "features": [
+                    {"attributes": {"id": 3}, "geometry": {"x": 3, "y": 3}},
+                ]
+            }
+        ),
+    ]
+    session = MockSession(responses)
+    client = SSOClient(base_url="http://example.com", session=session)
+
+    records = client.fetch_ssos(extra_params={"resultRecordCount": 2})
+
+    assert len(records) == 3
+    assert session.calls[1]["params"]["resultOffset"] == 0
+    assert session.calls[2]["params"]["resultOffset"] == 2

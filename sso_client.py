@@ -205,6 +205,46 @@ class SSOClient:
 
         return sorted(seen.values(), key=lambda item: item["name"].lower())
 
+    def permittee_permit_map(self) -> dict[str, dict[str, object]]:
+        """Return a mapping of permittee name -> details about their permits."""
+
+        raw = self._distinct_values([UTILITY_NAME_FIELD, UTILITY_ID_FIELD])
+        mapping: dict[str, dict[str, object]] = {}
+        for attrs in raw:
+            name = str(attrs.get(UTILITY_NAME_FIELD) or "").strip()
+            permit = str(attrs.get(UTILITY_ID_FIELD) or "").strip()
+            if not name and not permit:
+                continue
+            key = (name or permit).lower()
+            entry = mapping.setdefault(key, {"label": name or permit or key, "permits": set()})
+            if name:
+                entry["label"] = name
+            entry["permits"].add(permit or name)
+
+        normalized: dict[str, dict[str, object]] = {}
+        for key, entry in mapping.items():
+            normalized[key] = {
+                "label": entry["label"],
+                "permits": sorted(entry["permits"]),
+            }
+        return normalized
+
+    def list_permittees(self) -> list[dict[str, object]]:
+        """Return permittee display metadata with their associated permits."""
+
+        mapping = self.permittee_permit_map()
+        rows: list[dict[str, object]] = []
+        for key_lower, entry in mapping.items():
+            permits = list(entry.get("permits") or [])
+            if not permits:
+                continue
+            primary = permits[0]
+            name = str(entry.get("label") or key_lower).strip() or key_lower.title()
+            rows.append({"id": primary, "name": name, "permits": permits})
+
+        rows.sort(key=lambda item: item["name"].lower())
+        return rows
+
     def list_counties(self) -> list[str]:
         """Return distinct counties present in the ArcGIS layer."""
 

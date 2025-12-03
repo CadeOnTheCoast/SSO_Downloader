@@ -166,6 +166,7 @@ class SSOQuery:
 
     utility_id: Optional[str] = None
     utility_name: Optional[str] = None
+    permit_ids: Optional[List[str]] = None
     county: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -208,7 +209,13 @@ class SSOQuery:
 
         if self.county:
             clauses.append(f"{COUNTY_FIELD} = '{self._quote(self.county)}'")
-        if self.utility_id:
+        if self.permit_ids:
+            permit_values = ",".join(
+                f"'{self._quote(permit)}'" for permit in self.permit_ids if permit
+            )
+            if permit_values:
+                clauses.append(f"{UTILITY_ID_FIELD} IN ({permit_values})")
+        elif self.utility_id:
             clauses.append(f"{UTILITY_ID_FIELD} = '{self._quote(self.utility_id)}'")
         if self.utility_name:
             clauses.append(f"{UTILITY_NAME_FIELD} = '{self._quote(self.utility_name)}'")

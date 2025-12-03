@@ -42,9 +42,17 @@ DEFAULT_UTILITIES = [
 DEFAULT_COUNTIES = ALABAMA_COUNTIES
 
 
+def _safe_permit_map(client: SSOClient) -> dict[str, dict[str, object]]:
+    try:
+        return client.permittee_permit_map()
+    except Exception:
+        return {}
+
+
 class SSOQueryParams(BaseModel):
     utility_id: Optional[str] = Field(default=None, alias="utility_id")
     utility_name: Optional[str] = Field(default=None, alias="utility_name")
+    permit: Optional[str] = Field(default=None, alias="permit")
     county: Optional[str] = None
     start_date: Optional[str] = Field(
         default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
@@ -72,6 +80,7 @@ class SSOQueryParams(BaseModel):
     def has_filters(self) -> bool:
         return any(
             [
+                self.permit,
                 self.utility_id,
                 self.utility_name,
                 self.county,
@@ -80,11 +89,26 @@ class SSOQueryParams(BaseModel):
             ]
         )
 
-    def to_sso_query(self) -> SSOQuery:
+    def to_sso_query(
+        self, permit_map: Optional[dict[str, dict[str, object]]] = None
+    ) -> SSOQuery:
+        county = self.county.title() if self.county else None
+        utility_id = self.permit or self.utility_id
+
+        permit_ids: Optional[list[str]] = None
+        if utility_id:
+            permit_ids = [utility_id]
+        elif permit_map and self.utility_name:
+            entry = permit_map.get(self.utility_name.lower())
+            permits = entry.get("permits") if entry else None
+            if permits:
+                permit_ids = list(permits)
+
         return SSOQuery(
-            utility_id=self.utility_id,
-            utility_name=self.utility_name,
-            county=self.county,
+            utility_id=None if permit_ids else self.utility_id,
+            utility_name=None if permit_ids else self.utility_name,
+            county=county,
+            permit_ids=permit_ids,
             start_date=self._parse_date(self.start_date),
             end_date=self._parse_date(self.end_date),
         )
@@ -112,14 +136,26 @@ def health_check() -> dict[str, str]:
 
 def _load_options(client: SSOClient) -> dict[str, object]:
     utilities = DEFAULT_UTILITIES
+    permittees = [
+        {"id": item["id"], "name": item["name"], "permits": [item["id"]]}
+        for item in DEFAULT_UTILITIES
+    ]
     counties = list(DEFAULT_COUNTIES)
 
     try:
-        fresh_utilities = client.list_utilities()
-        if fresh_utilities:
-            utilities = fresh_utilities
+        fresh_permittees = client.list_permittees()
+        if fresh_permittees:
+            permittees = fresh_permittees
+            utilities = [
+                {"id": item.get("id"), "name": item.get("name")}
+                for item in fresh_permittees
+            ]
     except Exception:
         utilities = DEFAULT_UTILITIES
+        permittees = [
+            {"id": item["id"], "name": item["name"], "permits": [item["id"]]}
+            for item in DEFAULT_UTILITIES
+        ]
 
     try:
         fresh_counties = client.list_counties()
@@ -128,7 +164,7 @@ def _load_options(client: SSOClient) -> dict[str, object]:
     except Exception:
         counties = list(DEFAULT_COUNTIES)
 
-    return {"utilities": utilities, "counties": counties}
+    return {"utilities": utilities, "permittees": permittees, "counties": counties}
 
 
 @app.get("/filters")
@@ -156,9 +192,16 @@ def _ensure_filters(params: SSOQueryParams) -> None:
         )
 
 
+def _to_query(params: SSOQueryParams, client: SSOClient) -> SSOQuery:
+    permit_map = _safe_permit_map(client)
+    return params.to_sso_query(permit_map)
+
+
 def _build_filename(params: SSOQueryParams) -> str:
     parts = ["ssos"]
-    if params.utility_id:
+    if params.permit:
+        parts.append(params.permit)
+    elif params.utility_id:
         parts.append(params.utility_id)
     elif params.utility_name:
         parts.append(params.utility_name.replace(" ", "_"))
@@ -178,7 +221,7 @@ def _download_csv_response(
     params: SSOQueryParams, client: SSOClient
 ) -> StreamingResponse:
     _ensure_filters(params)
-    query = params.to_sso_query()
+    query = _to_query(params, client)
     try:
         query.validate()
     except ValueError as exc:
@@ -216,7 +259,7 @@ def download_csv(
 
 def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
     _ensure_filters(params)
-    query = params.to_sso_query()
+    query = _to_query(params, client)
     try:
         query.validate()
     except ValueError as exc:
@@ -235,7 +278,7 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
     records_norm = normalize_sso_records(raw_records)
     summary = build_dashboard_summary(records_norm)
 
-    if params.utility_id or params.utility_name:
+    if params.permit or params.utility_id or params.utility_name:
         summary["top_utilities_pie"] = []
 
     return summary
@@ -264,7 +307,7 @@ def series_by_date(
     client: SSOClient = Depends(get_client),
 ):
     _ensure_filters(params)
-    query = params.to_sso_query()
+    query = _to_query(params, client)
     try:
         query.validate()
     except ValueError as exc:
@@ -289,7 +332,7 @@ def series_by_utility(
     client: SSOClient = Depends(get_client),
 ):
     _ensure_filters(params)
-    query = params.to_sso_query()
+    query = _to_query(params, client)
     try:
         query.validate()
     except ValueError as exc:
@@ -335,7 +378,7 @@ def _fetch_normalized_records(
     """Shared record fetching logic for JSON table endpoints."""
 
     _ensure_filters(params)
-    query = params.to_sso_query()
+    query = _to_query(params, client)
     try:
         query.validate()
     except ValueError as exc:

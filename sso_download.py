@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import datetime
-from typing import Iterable
+from typing import Dict, List
 
 from sso_analytics import QAIssue, run_basic_qa, summarize_overall_volume, summarize_volume_by_utility
 from sso_schema import normalize_sso_records
@@ -75,8 +75,8 @@ def _ensure_filters_present(args: argparse.Namespace) -> None:
         )
 
 
-def _summarize(records: Iterable[dict], output_path: str, limit: int | None) -> None:
-    count = len(list(records)) if not isinstance(records, list) else len(records)
+def _summarize(records: List[Dict], output_path: str, limit: int | None) -> None:
+    count = len(records)
     message_parts = [f"Fetched {count} records"]
     if limit is not None and count >= limit:
         message_parts.append("(truncated by --limit)")

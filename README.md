@@ -80,12 +80,12 @@ Module I layers a human-friendly dashboard on top of the FastAPI app and analyti
 - **Run locally:** `uvicorn webapp.api:app --reload` and open `http://127.0.0.1:8000/dashboard`.
 - **Highlights:** headline stat cards now narrate total spills, gallons, and duration using the full ArcGIS dataset (with pagination under the hood); receiving-water names are normalized for charts/tables; utility filtering is permittee-based and county filtering uses the full county list; volume-share tooltips keep labels aligned with data.
 - **Controls:** searchable utility and county selectors populate from `/api/options`, and the buttons read “Summarize” (refresh the view) and “Download the data” (CSV).
-- **Notes:** Long, multi-year date ranges may take extra time to paginate through ArcGIS, but the summary will reflect all returned pages rather than the first 5,000 rows.
+- **Notes:** Long, multi-year date ranges may take extra time to paginate through ArcGIS, but the summary now paginates through all available pages (up to ~20,000 records by default) instead of stopping at the first few thousand rows.
 - **Features:**
   - Filters for utility, county, and date range (with optional record limit for the table).
   - Summary cards for totals, distinct utilities, and volume statistics with a visible date range.
   - Charts for spills by month, volume by utility (top 10), and counts by volume bucket (Chart.js via CDN).
-  - Tabular record preview sourced from `/api/ssos` with a CSV download button wired to `/api/ssos.csv`.
+  - Tabular record preview sourced from `/api/ssos` with a CSV download button wired to `/api/ssos.csv`. CSV exports format ArcGIS date fields in Central time, matching the CLI output.
 - **Dashboard API endpoints:**
   - `/api/options` (or `/filters`) – utility and county options for form controls.
   - `/api/ssos/summary` – aggregate metrics (totals plus by-month, by-utility, and volume buckets).

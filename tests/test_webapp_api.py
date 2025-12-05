@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+import csv
+import io
+from datetime import datetime, timedelta
 from typing import List
 
 from fastapi.testclient import TestClient
@@ -144,6 +146,40 @@ def test_dashboard_summary_returns_expected_payload():
     assert payload["by_receiving_water"]
 
 
+def test_dashboard_summary_uses_requested_date_range_and_limit_cap():
+    base_date = datetime(2024, 1, 1)
+    records = [
+        {
+            UTILITY_ID_FIELD: f"AL{i:07d}",
+            UTILITY_NAME_FIELD: "Utility A",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: base_date + timedelta(days=i),
+            VOLUME_GALLONS_FIELD: float(i),
+        }
+        for i in range(0, 3005)
+    ]
+
+    client = _set_client_override(records)
+
+    response = client.get(
+        "/api/ssos/summary",
+        params={
+            "utility_id": "AL0000001",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+        },
+    )
+    _clear_overrides()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary_counts"]["total_records"] == len(records)
+    assert payload["summary_counts"]["date_range"] == {
+        "min": "2024-01-01",
+        "max": "2024-12-31",
+    }
+
+
 def test_api_ssos_returns_items_with_limit():
     records = [
         {
@@ -209,6 +245,30 @@ def test_api_ssos_csv_aliases_download(tmp_path):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert "AL1234567" in response.text
+
+
+def test_api_ssos_csv_formats_dates_in_central_time():
+    epoch_ms = 1704067200000  # 2024-01-01 00:00:00 UTC -> 2023-12-31 18:00:00 CST
+    records = [
+        {
+            UTILITY_ID_FIELD: "AL1234567",
+            UTILITY_NAME_FIELD: "Sample Utility",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: epoch_ms,
+            VOLUME_GALLONS_FIELD: 100.0,
+        }
+    ]
+
+    client = _set_client_override(records)
+
+    response = client.get("/api/ssos.csv", params={"utility_id": "AL1234567"})
+    _clear_overrides()
+
+    assert response.status_code == 200
+    reader = csv.DictReader(io.StringIO(response.text))
+    rows = list(reader)
+    assert rows[0][START_DATE_FIELD] == "2023-12-31 18:00:00"
+    assert not rows[0][START_DATE_FIELD].isdigit()
 
 
 def test_api_options_aliases_filters():

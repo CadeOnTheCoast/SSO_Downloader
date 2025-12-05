@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from sso_volume import enrich_est_volume_fields, parse_est_volume
@@ -19,6 +20,9 @@ RECEIVING_WATER_FIELD = "receiving_water"
 CAUSE_FIELD = "cause"
 SEWER_SYSTEM_FIELD = "sewer_system"
 LOCATION_FIELD = "location"
+
+
+CENTRAL_TZ = ZoneInfo("America/Chicago")
 
 
 @dataclass
@@ -94,6 +98,40 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
         except ValueError:
             return None
     return None
+
+
+def format_datetime_central(value: Optional[datetime]) -> Optional[str]:
+    """Format datetimes in America/Chicago for CSV/JSON output.
+
+    Values returned by the ArcGIS API are treated as UTC if they are naive.
+    The formatted string matches the CLI's human-readable CSV output.
+    """
+
+    if value is None:
+        return None
+
+    dt = value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    try:
+        localized = dt.astimezone(CENTRAL_TZ)
+    except Exception:
+        return None
+
+    return localized.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def sso_record_to_csv_row(record: "SSORecord") -> Dict[str, Any]:
+    """Render an :class:`SSORecord` to a CSV-friendly mapping.
+
+    The raw attributes are preserved, with date fields converted to formatted
+    Central time strings for consistency with CLI exports.
+    """
+
+    row = dict(record.raw)
+    row[START_DATE_FIELD] = format_datetime_central(record.date_sso_began)
+    row[END_DATE_FIELD] = format_datetime_central(record.date_sso_stopped)
+    return row
 
 
 def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:

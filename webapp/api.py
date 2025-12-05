@@ -129,9 +129,8 @@ class SSOQueryParams(BaseModel):
     def bounded_limit(self, *, default: int, maximum: int) -> int:
         """Return a safe limit based on provided value and bounds."""
 
-        if self.limit is None:
-            return min(default, maximum)
-        return min(self.limit, maximum)
+        requested = self.limit or default
+        return min(requested, maximum)
 
 
 def get_client() -> SSOClient:

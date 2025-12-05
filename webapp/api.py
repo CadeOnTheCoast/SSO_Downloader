@@ -22,11 +22,13 @@ from sso_analytics import (
 )
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv_filelike
-from sso_schema import SSOQuery, normalize_sso_records
+from sso_schema import SSOQuery, normalize_sso_records, sso_record_to_csv_row
 from sso_volume import enrich_est_volume_fields
 from webapp.options_data import ALABAMA_COUNTIES
 
 app = FastAPI(title="SSO Downloader")
+
+MAX_WEB_RECORDS = 20000
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -240,15 +242,21 @@ def _download_csv_response(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        records = client.fetch_ssos(query=query, limit=params.limit)
+        safe_limit = params.bounded_limit(
+            default=MAX_WEB_RECORDS, maximum=MAX_WEB_RECORDS
+        )
+        records = client.fetch_ssos(query=query, limit=safe_limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     for record in records:
         enrich_est_volume_fields(record)
 
+    normalized_records = normalize_sso_records(records)
+    csv_rows = [sso_record_to_csv_row(record) for record in normalized_records]
+
     buffer = io.StringIO()
-    write_ssos_to_csv_filelike(records, buffer)
+    write_ssos_to_csv_filelike(csv_rows, buffer)
     buffer.seek(0)
 
     headers = {
@@ -278,7 +286,10 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        raw_records = client.fetch_ssos(query=query, limit=params.limit)
+        safe_limit = params.bounded_limit(
+            default=MAX_WEB_RECORDS, maximum=MAX_WEB_RECORDS
+        )
+        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -286,7 +297,10 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
         enrich_est_volume_fields(record)
 
     records_norm = normalize_sso_records(raw_records)
-    summary = build_dashboard_summary(records_norm)
+    summary = build_dashboard_summary(
+        records_norm,
+        date_range={"min": params.start_date, "max": params.end_date},
+    )
 
     if params.permit or params.utility_id or params.utility_name:
         summary["top_utilities_pie"] = []
@@ -371,7 +385,7 @@ def series_by_utility(
 
 class RecordsQueryParams(SSOQueryParams):
     offset: int = Field(default=0, ge=0)
-    limit: Optional[int] = Field(default=200, ge=1, le=10000)
+    limit: Optional[int] = Field(default=200, ge=1, le=MAX_WEB_RECORDS)
 
 
 def _fetch_normalized_records(
@@ -379,7 +393,7 @@ def _fetch_normalized_records(
     client: SSOClient,
     *,
     default_limit: int = 200,
-    maximum: int = 1000,
+    maximum: int = MAX_WEB_RECORDS,
 ):
     """Shared record fetching logic for JSON table endpoints."""
 
@@ -432,7 +446,7 @@ def list_records(
     client: SSOClient = Depends(get_client),
 ):
     sliced, total, safe_limit = _fetch_normalized_records(
-        params, client, default_limit=500, maximum=1000
+        params, client, default_limit=500, maximum=MAX_WEB_RECORDS
     )
 
     return {
@@ -449,7 +463,7 @@ def api_ssos(
     client: SSOClient = Depends(get_client),
 ):
     sliced, total, safe_limit = _fetch_normalized_records(
-        params, client, default_limit=200, maximum=5000
+        params, client, default_limit=200, maximum=MAX_WEB_RECORDS
     )
 
     return {

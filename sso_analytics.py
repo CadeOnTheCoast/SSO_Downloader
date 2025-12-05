@@ -550,7 +550,9 @@ def build_receiving_water_pie(
     return _pie(entries, total_volume, key="total_volume_gallons")
 
 
-def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
+def build_dashboard_summary(
+    records: Sequence[SSORecord], *, date_range: Optional[Dict[str, Optional[str]]] = None
+) -> Dict[str, Any]:
     """Build a dashboard-friendly summary payload."""
 
     volumes = [vol for vol in (_best_volume(record) for record in records) if vol is not None]
@@ -574,6 +576,10 @@ def build_dashboard_summary(records: Sequence[SSORecord]) -> Dict[str, Any]:
     date_values = [record.date_sso_began for record in records if record.date_sso_began]
     date_min = min(date_values).date().isoformat() if date_values else None
     date_max = max(date_values).date().isoformat() if date_values else None
+
+    if date_range is not None:
+        date_min = date_range.get("min") or date_min
+        date_max = date_range.get("max") or date_max
 
     time_series = build_time_series(records)
     top_utils = summarize_top_utilities(records)

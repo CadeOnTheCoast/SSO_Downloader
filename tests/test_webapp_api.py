@@ -180,6 +180,40 @@ def test_dashboard_summary_uses_requested_date_range_and_limit_cap():
     }
 
 
+def test_dashboard_summary_allows_more_than_two_thousand_records():
+    base_date = datetime(2021, 1, 1)
+    records = [
+        {
+            UTILITY_ID_FIELD: f"AL{i:07d}",
+            UTILITY_NAME_FIELD: "Utility Bulk",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: base_date + timedelta(days=i),
+            VOLUME_GALLONS_FIELD: float(i + 1),
+        }
+        for i in range(0, 5000)
+    ]
+
+    client = _set_client_override(records)
+
+    response = client.get(
+        "/api/ssos/summary",
+        params={
+            "start_date": "2021-01-01",
+            "end_date": "2025-12-31",
+            "county": "Mobile",
+        },
+    )
+    _clear_overrides()
+
+    assert response.status_code == 200
+    payload = response.json()
+    counts = payload["summary_counts"]
+
+    assert counts["total_records"] == len(records)
+    assert counts["total_volume_gallons"] == sum(float(i + 1) for i in range(0, 5000))
+    assert counts["date_range"] == {"min": "2021-01-01", "max": "2025-12-31"}
+
+
 def test_api_ssos_returns_items_with_limit():
     records = [
         {
@@ -267,6 +301,41 @@ def test_api_ssos_csv_formats_dates_in_central_time():
     assert response.status_code == 200
     reader = csv.DictReader(io.StringIO(response.text))
     rows = list(reader)
+    assert rows[0][START_DATE_FIELD] == "2023-12-31 18:00:00"
+    assert not rows[0][START_DATE_FIELD].isdigit()
+
+
+def test_api_ssos_csv_supports_large_exports():
+    base_date = datetime(2022, 1, 1)
+    records = [
+        {
+            UTILITY_ID_FIELD: f"AL{i:07d}",
+            UTILITY_NAME_FIELD: "Utility Bulk",
+            COUNTY_FIELD: "Mobile",
+            START_DATE_FIELD: base_date + timedelta(days=i),
+            VOLUME_GALLONS_FIELD: float(i + 1),
+        }
+        for i in range(0, 3005)
+    ]
+    records[0][START_DATE_FIELD] = 1704067200000
+
+    client = _set_client_override(records)
+
+    response = client.get(
+        "/api/ssos.csv",
+        params={
+            "utility_id": "AL0000001",
+            "start_date": "2022-01-01",
+            "end_date": "2025-12-31",
+        },
+    )
+    _clear_overrides()
+
+    assert response.status_code == 200
+    reader = csv.DictReader(io.StringIO(response.text))
+    rows = list(reader)
+
+    assert len(rows) == len(records)
     assert rows[0][START_DATE_FIELD] == "2023-12-31 18:00:00"
     assert not rows[0][START_DATE_FIELD].isdigit()
 

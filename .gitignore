@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thmbs.db
+
+# Project Specific
+adem_ca_chain.pem
+sso_reports_*.csv
+/Users/cade/SSOs/

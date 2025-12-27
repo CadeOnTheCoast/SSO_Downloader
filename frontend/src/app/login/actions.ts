@@ -13,7 +13,9 @@ export async function login(formData: FormData) {
     }
 
     // Pre-validate domain (safety check before sending email)
-    const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org').split(',')
+    const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org')
+        .split(',')
+        .map(d => d.trim().replace(/^@/, ''))
     const userDomain = email.split('@')[1]
 
     if (!allowedDomains.includes(userDomain)) {

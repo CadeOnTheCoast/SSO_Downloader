@@ -1,0 +1,32 @@
+name: Nightly data sync
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # 5 AM UTC daily
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic pydantic-settings supabase python-dotenv playwright requests pdfplumber pdf2image pytesseract pillow
+          playwright install chromium
+
+      - name: Run sync script
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/backend/src
+          python backend/src/nightly_sync.py

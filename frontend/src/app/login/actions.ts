@@ -28,11 +28,12 @@ export async function login(formData: FormData) {
         return 'https://sso-downloader.vercel.app/'
     }
 
+    const redirectUrl = `${await getURL()}auth/callback`
     const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
             shouldCreateUser: true,
-            emailRedirectTo: `${await getURL()}auth/callback`,
+            emailRedirectTo: redirectUrl,
         },
     })
 
@@ -41,5 +42,5 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    return redirect('/login?success=Check your email for the magic link!')
+    return redirect(`/login?success=Link sent to ${email} (Redirecting to: ${redirectUrl})`)
 }

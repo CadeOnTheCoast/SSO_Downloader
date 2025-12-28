@@ -23,12 +23,8 @@ export async function login(formData: FormData) {
     }
 
     const getURL = async () => {
-        // Simple Debug Check:
-        // If we are locally developing, use localhost.
-        // OTHERWISE, assume we are on the production Vercel app.
-        if (process.env.NODE_ENV === 'development') {
-            return 'http://localhost:3000/'
-        }
+        // FORCE PRODUCTION URL
+        // We are temporarily removing all logic to ensure Vercel uses this URL.
         return 'https://sso-downloader.vercel.app/'
     }
 

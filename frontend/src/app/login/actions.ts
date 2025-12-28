@@ -22,19 +22,13 @@ export async function login(formData: FormData) {
         return redirect('/login?error=Only authorized domains are allowed')
     }
 
-    const getURL = () => {
-        let url =
-            process?.env?.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production env vars
-            process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
-            'http://localhost:3000/'
-        // Make sure to include `https://` when not localhost.
-        url = url.includes('http') ? url : `https://${url}`
-        // Make sure to include a trailing `/`.
-        url = url.charAt(url.length - 1) === '/' ? url : `${url}/`
-        return url
+    const getURL = async () => {
+        // FORCE PRODUCTION URL
+        // We are temporarily removing all logic to ensure Vercel uses this URL.
+        return 'https://sso-downloader.vercel.app/'
     }
 
-    const redirectUrl = `${getURL()}auth/callback`
+    const redirectUrl = `${await getURL()}auth/callback`
     const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {

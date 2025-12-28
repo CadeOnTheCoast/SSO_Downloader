@@ -10,13 +10,16 @@ export const revalidate = 0 // Disable caching for real-time data
 export default async function DashboardPage() {
     const supabase = await createClient()
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    // TEMP: Auth disabled for debugging
+    // const {
+    //     data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-        return redirect('/login')
-    }
+    // if (!user) {
+    //     return redirect('/login')
+    // }
+
+    const user = { email: 'debug@mobilebaykeeper.org' } // Mock user for display
 
     // Fetch all reports (optimized for dashboard)
     // efficient query for stats

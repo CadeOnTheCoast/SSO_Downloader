@@ -25,7 +25,8 @@ export async function login(formData: FormData) {
     const getURL = () => {
         let url =
             process.env.NEXT_PUBLIC_SITE_URL ?? // Set this to your custom domain in production
-            process.env.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel
+            process.env.NEXT_PUBLIC_VERCEL_URL ?? // Manual prefix if used
+            process.env.VERCEL_URL ?? // Automatically set by Vercel
             'http://localhost:3000/'
         // Make sure to include `https://` when not localhost.
         url = url.includes('http') ? url : `https://${url}`

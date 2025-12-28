@@ -23,11 +23,29 @@ export async function login(formData: FormData) {
     }
 
     const getURL = () => {
+        // Try environment variables first
         let url =
-            process.env.NEXT_PUBLIC_SITE_URL ?? // Set this to your custom domain in production
-            process.env.NEXT_PUBLIC_VERCEL_URL ?? // Manual prefix if used
-            process.env.VERCEL_URL ?? // Automatically set by Vercel
-            'http://localhost:3000/'
+            process.env.NEXT_PUBLIC_SITE_URL ??
+            process.env.NEXT_PUBLIC_VERCEL_URL ??
+            process.env.VERCEL_URL ??
+            null
+
+        // If no env vars, try to get from headers (more reliable in server actions)
+        if (!url) {
+            const { headers } = require('next/headers')
+            const headersList = headers()
+            const host = headersList.get('host')
+            const protocol = headersList.get('x-forwarded-proto') || 'https'
+            if (host) {
+                url = `${protocol}://${host}`
+            }
+        }
+
+        // Final fallback
+        if (!url) {
+            url = 'http://localhost:3000/'
+        }
+
         // Make sure to include `https://` when not localhost.
         url = url.includes('http') ? url : `https://${url}`
         // Make sure to include a trailing `/`.

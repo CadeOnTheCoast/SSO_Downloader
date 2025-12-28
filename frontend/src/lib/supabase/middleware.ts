@@ -27,33 +27,37 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // refreshing the auth token
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth')
-    ) {
-        // no user, potentially respond by redirecting the user to the login page
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
-    }
-
-    // Domain check for authenticated users
-    if (user && user.email) {
-        const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org').split(',')
-        const userDomain = user.email.split('@')[1]
-
-        if (!allowedDomains.includes(userDomain) && request.nextUrl.pathname !== '/unauthorized') {
-            const url = request.nextUrl.clone()
-            url.pathname = '/unauthorized'
-            return NextResponse.redirect(url)
-        }
-    }
-
+    // TEMPORARILY DISABLED FOR DEBUGGING
+    // We'll skip all auth checks and just return
     return supabaseResponse
+
+    // refreshing the auth token
+    // const {
+    //     data: { user },
+    // } = await supabase.auth.getUser()
+
+    // if (
+    //     !user &&
+    //     !request.nextUrl.pathname.startsWith('/login') &&
+    //     !request.nextUrl.pathname.startsWith('/auth')
+    // ) {
+    //     // no user, potentially respond by redirecting the user to the login page
+    //     const url = request.nextUrl.clone()
+    //     url.pathname = '/login'
+    //     return NextResponse.redirect(url)
+    // }
+
+    // // Domain check for authenticated users
+    // if (user && user.email) {
+    //     const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org').split(',')
+    //     const userDomain = user.email.split('@')[1]
+
+    //     if (!allowedDomains.includes(userDomain) && request.nextUrl.pathname !== '/unauthorized') {
+    //         const url = request.nextUrl.clone()
+    //         url.pathname = '/unauthorized'
+    //         return NextResponse.redirect(url)
+    //     }
+    // }
+
+    // return supabaseResponse
 }

@@ -15,10 +15,10 @@ export async function login(formData: FormData) {
     // Pre-validate domain (safety check before sending email)
     const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org')
         .split(',')
-        .map(d => d.trim().replace(/^@/, ''))
-    const userDomain = email.split('@')[1]
+        .map(d => d.trim().replace(/^@/, '').toLowerCase())
+    const userDomain = email.split('@')[1]?.toLowerCase()
 
-    if (!allowedDomains.includes(userDomain)) {
+    if (!userDomain || !allowedDomains.includes(userDomain)) {
         return redirect('/login?error=Only authorized domains are allowed')
     }
 

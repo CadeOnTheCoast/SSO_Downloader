@@ -23,32 +23,39 @@ export async function login(formData: FormData) {
     }
 
     const getURL = async () => {
-        // Try environment variables first
+        // 1. Try environment variables
         let url =
             process.env.NEXT_PUBLIC_SITE_URL ??
             process.env.NEXT_PUBLIC_VERCEL_URL ??
             process.env.VERCEL_URL ??
             null
 
-        // If no env vars, try to get from headers (more reliable in server actions)
+        // 2. Try headers (if no env vars)
         if (!url) {
-            const { headers } = await import('next/headers')
-            const headersList = await headers()
-            const host = headersList.get('host')
-            const protocol = headersList.get('x-forwarded-proto') || 'https'
-            if (host) {
-                url = `${protocol}://${host}`
+            try {
+                const { headers } = await import('next/headers')
+                const headersList = await headers()
+                const host = headersList.get('host')
+                const protocol = headersList.get('x-forwarded-proto') || 'https'
+                if (host && !host.includes('localhost')) {
+                    url = `${protocol}://${host}`
+                }
+            } catch (e) {
+                // Ignore header errors
             }
         }
 
-        // Final fallback
+        // 3. Final Fallback based on environment
         if (!url) {
-            url = 'http://localhost:3000/'
+            if (process.env.NODE_ENV === 'production') {
+                url = 'https://sso-downloader.vercel.app/'
+            } else {
+                url = 'http://localhost:3000/'
+            }
         }
 
-        // Make sure to include `https://` when not localhost.
+        // Normalize
         url = url.includes('http') ? url : `https://${url}`
-        // Make sure to include a trailing `/`.
         url = url.endsWith('/') ? url : `${url}/`
         return url
     }

@@ -22,7 +22,7 @@ export async function login(formData: FormData) {
         return redirect('/login?error=Only authorized domains are allowed')
     }
 
-    const getURL = () => {
+    const getURL = async () => {
         // Try environment variables first
         let url =
             process.env.NEXT_PUBLIC_SITE_URL ??
@@ -32,8 +32,8 @@ export async function login(formData: FormData) {
 
         // If no env vars, try to get from headers (more reliable in server actions)
         if (!url) {
-            const { headers } = require('next/headers')
-            const headersList = headers()
+            const { headers } = await import('next/headers')
+            const headersList = await headers()
             const host = headersList.get('host')
             const protocol = headersList.get('x-forwarded-proto') || 'https'
             if (host) {
@@ -57,7 +57,7 @@ export async function login(formData: FormData) {
         email,
         options: {
             shouldCreateUser: true,
-            emailRedirectTo: `${getURL()}auth/callback`,
+            emailRedirectTo: `${await getURL()}auth/callback`,
         },
     })
 

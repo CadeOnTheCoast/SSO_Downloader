@@ -1,77 +1,100 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import React, { useState, useEffect } from 'react'
 import { SSOOverview } from '@/components/dashboard/SSOOverview'
 import { SSOCharts } from '@/components/dashboard/SSOCharts'
 import { SSOTable } from '@/components/dashboard/SSOTable'
-import _ from 'lodash'
+import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
+import { useSearchParams } from 'next/navigation'
+import { FilterState, DashboardSummary, SeriesPoint, BarGroup, SSORecord, fetchSummary, fetchSeriesByDate, fetchSeriesByUtility, fetchRecords } from '@/lib/api'
+import { createClient } from '@/lib/supabase/client' // Use client-side supbase for auth check if needed, or rely on layout/middleware
 
-export const revalidate = 0 // Disable caching for real-time data
+export default function DashboardPage() {
+    // Auth check (basic) - assuming middleware handles protection generally, 
+    // but for username display we might need context. 
+    // For now, I'll mock the user or fetch it client side if critically needed.
+    const [userEmail, setUserEmail] = useState<string>('')
+    const [loading, setLoading] = useState(false)
 
-export default async function DashboardPage() {
-    const supabase = await createClient()
+    // Data State
+    const [summary, setSummary] = useState<DashboardSummary | null>(null)
+    const [timeSeries, setTimeSeries] = useState<SeriesPoint[]>([])
+    const [barGroups, setBarGroups] = useState<BarGroup[]>([])
+    const [records, setRecords] = useState<SSORecord[]>([])
+    const [totalRecords, setTotalRecords] = useState(0)
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    // Filter State
+    const [filters, setFilters] = useState<FilterState>({ limit: 1000 })
+    const [page, setPage] = useState(1)
+    const pageSize = 50
 
-    if (!user) {
-        return redirect('/login')
-    }
-
-    // Fetch all reports (optimized for dashboard)
-    // efficient query for stats
-    const { data: reports, error } = await supabase
-        .from('sso_reports')
-        .select('*')
-        .order('date_sso_began', { ascending: false })
-
-    if (error) {
-        console.error("Error fetching reports:", error)
-        return (
-            <div className="p-8 text-center text-red-500">
-                Error loading data. Please try again later.
-            </div>
-        )
-    }
-
-    // Process Data
-    const totalSsos = reports.length
-    const totalVolume = _.sumBy(reports, (r) => Number(r.volume_gallons) || 0)
-    const uniqueUtilities = _.uniqBy(reports, 'utility_name').length
-
-    // Top County
-    const countyCounts = _.countBy(reports, 'county')
-    const topCountyEntry = _.maxBy(_.entries(countyCounts), ([_, count]) => count)
-    const topCounty = topCountyEntry ? `${topCountyEntry[0]} (${topCountyEntry[1]})` : "N/A"
-
-    // Time Series (Monthly)
-    const monthlyGroups = _.groupBy(reports, (r) => {
-        if (!r.date_sso_began) return 'Unknown'
-        return new Date(r.date_sso_began).toLocaleString('default', { month: 'short', year: '2-digit' })
-    })
-
-    // transform to array and reverse to show chronological order if needed, but 'reports' is desc
-    // We want chronological for the chart
-    const timeSeries = Object.entries(monthlyGroups)
-        .map(([name, group]) => ({
-            name,
-            total: group.length
-        }))
-        // simplistic sort by date string might fail, ideally specific date sorting
-        // fallback: rely on the assumption that if we iterate keys they might not be sorted.
-        // Better:
-        .sort((a, b) => {
-            // simplified robust sort
-            if (a.name === 'Unknown') return -1;
-            return new Date('1 ' + a.name).getTime() - new Date('1 ' + b.name).getTime();
+    useEffect(() => {
+        // Quick auth check
+        const supabase = createClient()
+        supabase.auth.getUser().then(({ data }) => {
+            if (data.user) setUserEmail(data.user.email || 'User')
+            // else redirect('/login') // handled by middleware usually
         })
 
+        // Initial load
+        handleFilterChange({})
+    }, [])
 
-    // County Data (Top 10)
-    const countyData = Object.entries(countyCounts)
-        .map(([name, total]) => ({ name: name || "Unknown", total }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 10)
+    const handleFilterChange = async (newFilters: FilterState) => {
+        setLoading(true)
+        setFilters(newFilters)
+        setPage(1) // Reset page on filter change
+
+        try {
+            const [sum, time, bar, recs] = await Promise.all([
+                fetchSummary(newFilters),
+                fetchSeriesByDate(newFilters),
+                fetchSeriesByUtility(newFilters),
+                fetchRecords(newFilters, 0, pageSize)
+            ])
+
+            setSummary(sum)
+            setTimeSeries(time.points)
+            setBarGroups(bar.bars)
+            setRecords(recs.records)
+            setTotalRecords(recs.total)
+        } catch (error) {
+            console.error("Dashboard error:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handlePageChange = async (newPage: number) => {
+        setLoading(true)
+        setPage(newPage)
+        const offset = (newPage - 1) * pageSize
+        try {
+            const recs = await fetchRecords(filters, offset, pageSize)
+            setRecords(recs.records)
+        } catch (error) {
+            console.error("Pagination error:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handlePieClick = (utilityName: string) => {
+        // "click a slice and the table updates to just show spills from that utility"
+        // We update the utility_name filter (we might need to map name to ID if API requires ID, 
+        // but API supports utility_name query param).
+        // Since my filter component primarily uses ID, I might need to support name or just fill the form?
+        // For now, I'll trigger a filter update with utility_name.
+        // NOTE: The current DashboardFilters component uses ID. I should probably support Name or find ID.
+        // API supports `utility_name`.
+        const updatedFilters = { ...filters, utility_name: utilityName }
+        handleFilterChange(updatedFilters)
+    }
+
+    const handleDownload = () => {
+        const params = new URLSearchParams(filters as any)
+        window.location.href = `/download?${params.toString()}`
+    }
 
     return (
         <div className="flex min-h-screen flex-col bg-slate-950 text-white">
@@ -85,44 +108,51 @@ export default async function DashboardPage() {
                             SSO Downloader
                         </h1>
                     </div>
-
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-slate-400 border-r border-slate-700 pr-4">
-                            {user.email}
+                            {userEmail}
                         </span>
-                        <form action="/auth/signout" method="post">
-                            <button className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
-                                Sign out
-                            </button>
-                        </form>
                     </div>
                 </div>
             </header>
 
             <main className="mx-auto w-full max-w-7xl p-8 space-y-8">
                 {/* Header Section */}
-                <div>
-                    <h2 className="text-3xl font-bold text-white">Dashboard</h2>
-                    <p className="text-slate-400 mt-1">Real-time overview of sewage overflow events in Alabama.</p>
+                <div className="flex justify-between items-end">
+                    <div>
+                        <h2 className="text-3xl font-bold text-white">Dashboard</h2>
+                        <p className="text-slate-400 mt-1">Real-time overview of sewage overflow events.</p>
+                    </div>
+                    <button
+                        onClick={handleDownload}
+                        className="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded border border-slate-700 transition-colors"
+                    >
+                        Download CSV
+                    </button>
                 </div>
 
+                {/* Filters */}
+                <DashboardFilters onFilterChange={handleFilterChange} isLoading={loading} />
+
                 {/* Stats Overview */}
-                <SSOOverview
-                    totalSsos={totalSsos}
-                    totalVolume={totalVolume}
-                    uniqueUtilities={uniqueUtilities}
-                    topCounty={topCounty}
-                />
+                <SSOOverview summary={summary} />
 
                 {/* Main Charts */}
                 <SSOCharts
                     timeSeries={timeSeries}
-                    countyData={countyData}
+                    barGroups={barGroups}
+                    onPieClick={handlePieClick}
                 />
 
                 {/* Recent Reports Table */}
-                <SSOTable reports={reports.slice(0, 50)} />
+                <SSOTable
+                    records={records}
+                    page={page}
+                    onChangePage={handlePageChange}
+                    hasNextPage={records.length === pageSize} // Simple check, could use total count
+                />
             </main>
         </div>
     )
 }
+

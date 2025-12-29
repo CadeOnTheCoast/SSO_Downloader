@@ -1,0 +1,49 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/ssos",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/api/ssos.csv",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/api/options",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/summary",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/series/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/records",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/filters",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/download",
+      "destination": "/api/index.py"
+    }
+  ],
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 30
+      }
+    }
+  ]
+}

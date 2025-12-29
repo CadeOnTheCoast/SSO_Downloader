@@ -10,12 +10,14 @@ export interface SeriesPoint {
     date: string
     count: number
     volume: number
+    [key: string]: any;
 }
 
 export interface BarGroup {
     label: string
     count: number
     total_volume_gallons: number
+    [key: string]: any;
 }
 
 export interface SSORecord {

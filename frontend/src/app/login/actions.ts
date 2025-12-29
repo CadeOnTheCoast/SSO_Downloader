@@ -42,5 +42,5 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    return redirect(`/login?success=Link sent to ${email} (Redirecting to: ${redirectUrl})`)
+    return redirect('/login?success=Check your email for the magic link!')
 }

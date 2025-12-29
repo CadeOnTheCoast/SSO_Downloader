@@ -10,7 +10,7 @@ export default function LoginPage({
             <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200">
                 <div className="mb-8 text-center">
                     <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                        SSO Downloader <span className="text-sm font-normal text-slate-500">(v3 Debug)</span>
+                        SSO Downloader
                     </h1>
                     <p className="mt-2 text-slate-600">
                         Sign in with your email to access the dashboard.

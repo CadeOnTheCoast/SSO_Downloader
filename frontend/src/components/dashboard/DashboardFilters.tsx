@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { FilterOptions, FilterState, fetchFilters } from '@/lib/api'
-import { Card } from '@/components/ui/card' // Assuming standard shadcn card exists, or I will use div if not. I'll stick to simple tailwind for now given ui folder issue.
 import { Loader2 } from 'lucide-react'
 
 interface DashboardFiltersProps {

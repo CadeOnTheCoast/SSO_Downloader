@@ -1,13 +1,13 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts"
 import { SeriesPoint, BarGroup } from "@/lib/api"
 
 interface SSOChartsProps {
     timeSeries: SeriesPoint[]
     barGroups: BarGroup[]
-    pieData?: { name: string, value: number }[] // For top utilities or similar
+    pieData?: { name: string, value: number }[]
     onPieClick?: (utilityName: string) => void
 }
 
@@ -17,9 +17,9 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
     return (
         <div className="grid gap-4 md:grid-cols-2">
             {/* Time Series Chart */}
-            <Card className="col-span-2 bg-slate-900/50 border-slate-800 text-white">
+            <Card className="col-span-2 text-white">
                 <CardHeader>
-                    <CardTitle className="text-slate-200">Spills Over Time</CardTitle>
+                    <CardTitle className="text-slate-200 text-lg">Spills Over Time</CardTitle>
                 </CardHeader>
                 <CardContent className="pl-2">
                     <div className="h-[300px] w-full">
@@ -59,9 +59,9 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
             </Card>
 
             {/* Volume by Utility (Bar Chart) */}
-            <Card className="col-span-1 bg-slate-900/50 border-slate-800 text-white">
+            <Card className="col-span-1 text-white">
                 <CardHeader>
-                    <CardTitle className="text-slate-200">Volume by Utility (Top 10)</CardTitle>
+                    <CardTitle className="text-slate-200 text-lg">Volume by Utility (Top 10)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[300px] w-full">
@@ -92,16 +92,16 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
             </Card>
 
             {/* Top Utilities by Volume (Pie Chart) - Interactive */}
-            <Card className="col-span-1 bg-slate-900/50 border-slate-800 text-white">
+            <Card className="col-span-1 text-white">
                 <CardHeader>
-                    <CardTitle className="text-slate-200">High Volume Sources</CardTitle>
+                    <CardTitle className="text-slate-200 text-lg">High Volume Sources</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={barGroups.slice(0, 5)} // Top 5 for cleaner pie
+                                    data={barGroups.slice(0, 5)}
                                     dataKey="total_volume_gallons"
                                     nameKey="label"
                                     cx="50%"

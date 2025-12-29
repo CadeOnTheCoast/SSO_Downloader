@@ -1,14 +1,10 @@
-"use client"
-
-
 'use client'
 
 import React from 'react'
 import { Droplets, Activity, Building2, MapPin, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from './Card'
 import { DashboardSummary } from '@/lib/api'
 
-// Helper component since I can't rely on existing UI folder structure 100%
 function StatCard({ title, value, icon: Icon, subtext }: { title: string, value: string | number, icon: any, subtext?: string }) {
     return (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">

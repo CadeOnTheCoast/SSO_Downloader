@@ -21,13 +21,15 @@ export async function GET(request: Request) {
             } else {
                 return NextResponse.redirect(`${origin}${next}`)
             }
-            if (error) {
-                console.error('Auth Loop Error: Code exchange failed', error)
-            }
-        } else {
-            console.error('Auth Loop Error: No code provided')
         }
 
-        // return the user to an error page with instructions
-        return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+        if (error) {
+            console.error('Auth Loop Error: Code exchange failed', error)
+        }
+    } else {
+        console.error('Auth Loop Error: No code provided')
     }
+
+    // return the user to an error page with instructions
+    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+}

@@ -14,18 +14,26 @@ interface SSOChartsProps {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+function getUtilitySlug(name: string): string {
+    return name
+        .replace(/Board|Commission|Authority|Utilities|Utility|Water|Sewer|Works|Board of/gi, '')
+        .trim()
+        .substring(0, 15);
+}
+
 export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }: SSOChartsProps) {
-    const showTimeSeries = timeSeries && timeSeries.length >= 60;
+    const showTimeSeries = timeSeries && timeSeries.length > 0;
+    const totalVolume = barGroups.reduce((acc, curr) => acc + curr.total_volume_gallons, 0);
 
     return (
         <div className="grid gap-6 md:grid-cols-2">
             {/* Time Series Chart */}
-            {showTimeSeries ? (
-                <Card className="col-span-2 text-white border-slate-800 bg-slate-900/50">
-                    <CardHeader>
-                        <CardTitle className="text-slate-200 text-lg">Spills Over Time</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pl-2">
+            <Card className="col-span-2 text-white border-slate-800 bg-slate-900/50">
+                <CardHeader>
+                    <CardTitle className="text-slate-200 text-lg">Spills Over Time</CardTitle>
+                </CardHeader>
+                <CardContent className="pl-2">
+                    {showTimeSeries ? (
                         <div className="h-[300px] min-h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={timeSeries}>
@@ -58,13 +66,13 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="col-span-2 bg-slate-900/30 border border-slate-800 rounded-xl p-8 text-center flex items-center justify-center">
-                    <p className="text-slate-500 italic text-sm">Time-series charts are shown for windows of 60 days or longer.</p>
-                </div>
-            )}
+                    ) : (
+                        <div className="h-[300px] flex items-center justify-center bg-slate-900/10 rounded-lg">
+                            <p className="text-slate-500 italic text-sm">No time-series data available for this range.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Volume by Utility (Bar Chart) */}
             <Card className="col-span-1 text-white border-slate-800 bg-slate-900/50">
@@ -80,18 +88,21 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                 <YAxis
                                     dataKey="label"
                                     type="category"
-                                    width={150}
+                                    width={120}
                                     stroke="#64748b"
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tickFormatter={(value) => value.length > 25 ? `${value.substring(0, 22)}...` : value}
+                                    tickFormatter={(value) => getUtilitySlug(value)}
                                 />
                                 <Tooltip
                                     cursor={{ fill: '#1e293b' }}
                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
                                     itemStyle={{ color: '#e2e8f0' }}
-                                    formatter={(value: any) => `${(value ?? 0).toLocaleString()} gal`}
+                                    formatter={(value: any, name: any, props: any) => [
+                                        `${(value ?? 0).toLocaleString()} gal`,
+                                        props.payload.label
+                                    ]}
                                 />
                                 <Bar dataKey="total_volume_gallons" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                             </BarChart>
@@ -119,6 +130,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     fill="#8884d8"
                                     onClick={(data) => onPieClick && onPieClick(data.label)}
                                     cursor="pointer"
+                                    label={({ label, percent }) => `${getUtilitySlug(label)} ${(percent * 100).toFixed(0)}%`}
                                 >
                                     {barGroups.slice(0, 5).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -127,12 +139,16 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
                                     itemStyle={{ color: '#e2e8f0' }}
-                                    formatter={(value: any, name: any) => [`${(value ?? 0).toLocaleString()} gal`, name]}
+                                    formatter={(value: any, name: any) => {
+                                        const pct = totalVolume > 0 ? ((value / totalVolume) * 100).toFixed(1) : 0;
+                                        return [`${(value ?? 0).toLocaleString()} gal (${pct}%)`, name];
+                                    }}
                                 />
                                 <Legend
                                     verticalAlign="bottom"
                                     height={36}
                                     wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
+                                    formatter={(value) => getUtilitySlug(value)}
                                 />
                             </PieChart>
                         </ResponsiveContainer>

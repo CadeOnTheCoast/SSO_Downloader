@@ -38,7 +38,17 @@ export default function DashboardPage() {
         supabase.auth.getUser().then(({ data }) => {
             if (data.user) setUserEmail(data.user.email || 'User')
         })
-        handleFilterChange({})
+
+        // Initialize with YTD
+        const now = new Date()
+        const startOfYear = `${now.getFullYear()}-01-01`
+        const today = now.toISOString().split('T')[0]
+
+        handleFilterChange({
+            start_date: startOfYear,
+            end_date: today,
+            limit: 1000
+        })
     }, [])
 
     const handleFilterChange = async (newFilters: FilterState) => {

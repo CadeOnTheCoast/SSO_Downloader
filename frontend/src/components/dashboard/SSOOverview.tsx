@@ -52,58 +52,58 @@ export function SSOOverview({ summary }: SSOOverviewProps) {
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between pb-2">
-                        <h3 className="text-sm font-medium text-slate-400">Raw sewage spills</h3>
-                        <Activity className="h-4 w-4 text-blue-500" />
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-blue-500/30 transition-all">
+                    <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Activity className="h-6 w-6 text-blue-500" />
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                        There were <span className="text-white font-bold">{summary.total_count}</span> raw sewage spills from {formatDate(startDate)} to {formatDate(endDate)}. That's about <span className="text-white font-bold">{spillsPerDay}</span> spills per day.
-                    </p>
+                    <div className="text-4xl font-bold text-white mb-2">{summary.total_count.toLocaleString()}</div>
+                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Raw sewage spills</div>
+                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500">
+                        Avg <span className="text-slate-300 font-semibold">{spillsPerDay}</span>/day since {formatDate(startDate)}
+                    </div>
                 </div>
 
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between pb-2">
-                        <h3 className="text-sm font-medium text-slate-400">Gallons of raw sewage</h3>
-                        <Droplets className="h-4 w-4 text-emerald-500" />
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-emerald-500/30 transition-all">
+                    <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Droplets className="h-6 w-6 text-emerald-500" />
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                        From {formatDate(startDate)} to {formatDate(endDate)}, <span className="text-white font-bold">{(summary.total_volume ?? 0).toLocaleString()}</span> gallons of raw sewage were reported. That's about <span className="text-white font-bold">{gallonsPerHour}</span> gallons spilled per hour.
-                    </p>
+                    <div className="text-4xl font-bold text-white mb-2">{summary.total_volume.toLocaleString()}</div>
+                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Gallons of raw sewage</div>
+                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500">
+                        Avg <span className="text-slate-300 font-semibold">{gallonsPerHour}</span> gal/hour
+                    </div>
                 </div>
 
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between pb-2">
-                        <h3 className="text-sm font-medium text-slate-400">Time sewage was spilling</h3>
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-amber-500/30 transition-all">
+                    <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <AlertTriangle className="h-6 w-6 text-amber-500" />
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                        Raw sewage was spilling for about <span className="text-white font-bold">{durationStr}</span> over this period.
-                    </p>
+                    <div className="text-4xl font-bold text-white mb-2 text-wrap px-4">{durationStr}</div>
+                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Total spill duration</div>
+                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500 italic">
+                        Cumulative time spilling raw sewage
+                    </div>
                 </div>
             </div>
 
             {/* Fun Analogies Section */}
             {summary.volume_analogies && summary.volume_analogies.length > 0 && (
-                <div className="bg-gradient-to-br from-blue-900/20 to-slate-900 border border-blue-500/20 rounded-xl p-8">
-                    <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-blue-400" />
-                        How much is that?
-                    </h3>
-
-                    <p className="text-slate-300 leading-relaxed mb-6">
-                        Approximately <span className="text-white font-bold">{(summary.total_volume ?? 0).toLocaleString()}</span> gallons of raw sewage were reported over this period.
-                        {summary.volume_analogies.map(a => a.text).join(' ')}
-                    </p>
+                <div className="bg-gradient-to-br from-blue-900/10 to-transparent border border-blue-500/10 rounded-xl p-8">
+                    <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-[0.2em] mb-6 text-center">Volume Perspective</h3>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         {summary.volume_analogies.map((analogy, idx) => (
-                            <div key={idx} className="bg-slate-950/50 border border-blue-500/10 rounded-lg p-4 relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-                                <div className="absolute top-2 right-2 text-2xl opacity-10 group-hover:opacity-20 transition-opacity">
+                            <div key={idx} className="bg-slate-950/40 border border-slate-800 rounded-lg p-5 relative overflow-hidden group hover:border-blue-500/20 transition-all">
+                                <div className="absolute -top-1 -right-1 text-3xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
                                     {analogy.emoji}
                                 </div>
-                                <div className="text-xs font-medium text-blue-400 mb-1">{analogy.label}</div>
-                                <div className="text-xl font-bold text-white">{analogy.value}</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <span>{analogy.emoji}</span> {analogy.label}
+                                </div>
+                                <div className="text-xl font-bold text-white mb-1">{analogy.value}</div>
+                                <div className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                                    {analogy.text}
+                                </div>
                             </div>
                         ))}
                     </div>

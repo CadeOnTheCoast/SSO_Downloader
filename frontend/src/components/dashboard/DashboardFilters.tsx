@@ -11,8 +11,13 @@ interface DashboardFiltersProps {
 
 export function DashboardFilters({ onFilterChange, isLoading }: DashboardFiltersProps) {
     const [options, setOptions] = useState<FilterOptions | null>(null)
-    const [filters, setFilters] = useState<FilterState>({
-        limit: 1000 // Default limit
+    const [filters, setFilters] = useState<FilterState>(() => {
+        const now = new Date()
+        return {
+            start_date: `${now.getFullYear()}-01-01`,
+            end_date: now.toISOString().split('T')[0],
+            limit: 1000
+        }
     })
     const [loadingOptions, setLoadingOptions] = useState(true)
 
@@ -94,24 +99,30 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
                 {/* Start Date */}
                 <div className="space-y-2">
-                    <label className="text-xs text-slate-400 font-medium">Start Date</label>
-                    <input
-                        type="date"
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={filters.start_date || ''}
-                        onChange={(e) => handleChange('start_date', e.target.value || undefined)}
-                    />
+                    <label className="text-xs text-slate-400 font-medium tracking-wider uppercase opacity-60">Start Date</label>
+                    <div className="relative">
+                        <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-400 z-10 pointer-events-none" />
+                        <input
+                            type="date"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                            value={filters.start_date || ''}
+                            onChange={(e) => handleChange('start_date', e.target.value || undefined)}
+                        />
+                    </div>
                 </div>
 
                 {/* End Date */}
                 <div className="space-y-2">
-                    <label className="text-xs text-slate-400 font-medium">End Date</label>
-                    <input
-                        type="date"
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={filters.end_date || ''}
-                        onChange={(e) => handleChange('end_date', e.target.value || undefined)}
-                    />
+                    <label className="text-xs text-slate-400 font-medium tracking-wider uppercase opacity-60">End Date</label>
+                    <div className="relative">
+                        <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-400 z-10 pointer-events-none" />
+                        <input
+                            type="date"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                            value={filters.end_date || ''}
+                            onChange={(e) => handleChange('end_date', e.target.value || undefined)}
+                        />
+                    </div>
                 </div>
 
                 {/* Limit */}

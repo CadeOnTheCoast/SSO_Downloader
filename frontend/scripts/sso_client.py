@@ -60,8 +60,29 @@ class SSOClient:
         self._supports_pagination: Optional[bool] = None
         self._max_record_count: Optional[int] = None
 
+        # SSL Configuration
+        self.verify: bool | str = True
+        if os.getenv("VERIFY_SSL", "").lower() == "false":
+            self.verify = False
+        else:
+            # Look for the internal ADEM CA chain
+            cert_paths = [
+                os.path.join(os.path.dirname(__file__), "adem_ca_chain.pem"),
+                os.path.join(os.path.dirname(__file__), "../adem_ca_chain.pem"),
+                "adem_ca_chain.pem"
+            ]
+            for path in cert_paths:
+                if os.path.exists(path):
+                    self.verify = path
+                    break
+
     def _get(self, params: Dict[str, Any], *, url: Optional[str] = None) -> Dict[str, Any]:
-        response = self.session.get(url or self.base_url, params=params, timeout=self.timeout)
+        response = self.session.get(
+            url or self.base_url, 
+            params=params, 
+            timeout=self.timeout,
+            verify=self.verify
+        )
         if not response.ok:
             raise SSOClientError(
                 f"Request failed with status {response.status_code}: {response.text[:200]}"

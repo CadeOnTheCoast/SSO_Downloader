@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from statistics import mean, median
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from typing import Literal
 
 from sso_schema import SSORecord
@@ -123,19 +123,13 @@ def _normalize_receiving_water_name(raw_value: Optional[str]) -> Optional[str]:
 
 
 def _best_volume(record: SSORecord) -> Optional[float]:
-    est_high = getattr(record, "est_volume_high", None)
-    if est_high is None and hasattr(record, "raw"):
-        est_high = record.raw.get("est_volume_high")
-    if est_high is not None:
-        try:
-            return float(est_high)
-        except (TypeError, ValueError):  # pragma: no cover - defensive
-            pass
+    # We prioritize the calculated est_volume_gal if available, 
+    # then fallback to the direct volume_gallons field.
     if record.est_volume_gal is not None:
         try:
             return float(record.est_volume_gal)
-        except (TypeError, ValueError):  # pragma: no cover - defensive
-            return None
+        except (TypeError, ValueError):
+            pass
     return _usable_volume(record)
 
 
@@ -583,29 +577,20 @@ def build_dashboard_summary(
 
     time_series = build_time_series(records)
     top_utils = summarize_top_utilities(records)
-    top_receiving = summarize_top_receiving_waters(records)
     by_receiving_water = summarize_by_receiving_water(records, top_n=10)
 
     payload: Dict[str, Any] = {
-        "summary_counts": {
-            "total_records": len(records),
-            "total_spills": len(records),
-            "total_volume_gallons": total_volume,
-            "total_volume": total_volume,
-            "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
-            "avg_volume": avg_volume,
-            "max_volume": max_volume,
-            "distinct_utilities": len(utilities),
-            "distinct_receiving_waters": len(receiving_waters),
-            "date_range": {"min": date_min, "max": date_max},
-        },
-        "time_series": time_series,
+        "total_count": len(records),
+        "total_volume": total_volume,
+        "avg_volume": avg_volume,
+        "max_volume": max_volume,
+        "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
+        "distinct_utilities": len(utilities),
+        "distinct_receiving_waters": len(receiving_waters),
+        "date_range": {"min": date_min, "max": date_max},
+        "time_series": time_series.get("points", []),
         "top_utilities": top_utils,
         "top_utilities_pie": build_utility_pie(top_utils, total_volume),
-        "top_receiving_waters": top_receiving,
-        "receiving_waters_pie": build_receiving_water_pie(
-            top_receiving, total_volume
-        ),
         "by_receiving_water": [
             {
                 "name": item.get("name") or item.get("receiving_water_name"),
@@ -614,10 +599,10 @@ def build_dashboard_summary(
             }
             for item in by_receiving_water
         ],
-        # Legacy fields kept for backward compatibility
         "by_month": summarize_by_month(records),
         "by_utility": summarize_by_utility(records),
         "by_volume_bucket": summarize_by_volume_bucket(records),
+        "volume_analogies": compute_volume_analogies(total_volume),
     }
 
     return payload
@@ -739,3 +724,59 @@ def top_spills_by_volume(records: Iterable[SSORecord], n: int = 10) -> List[Spil
         )
         for record in top_records
     ]
+
+
+def compute_volume_analogies(total_gallons: float) -> List[Dict[str, Any]]:
+    """Compute relatable 'real-world' analogies for a volume in gallons."""
+    if total_gallons <= 0:
+        return []
+
+    # Constants for analogies
+    KEG_GALLONS = 15.5
+    WATER_BALLOON_GALLONS = 0.1  # Approx 400ml
+    OLYMPIC_POOL_GALLONS = 660_000
+    # Bryant Denny Field (football field: 360ft x 160ft = 57,600 sq ft)
+    # 1 cu ft = 7.48 gallons. 1 foot deep = 430,848 gallons.
+    BRYANT_DENNY_FOOT_DEEP_GALLONS = 430_848
+
+    analogies = []
+
+    # Kegs
+    keg_count = total_gallons / KEG_GALLONS
+    analogies.append({
+        "label": "Kegs of Raw Sewage",
+        "value": f"{keg_count:,.0f}",
+        "emoji": "🍺",
+        "text": f"That's enough raw sewage to fill {keg_count:,.0f} kegs."
+    })
+
+    # Water Balloons
+    balloon_count = total_gallons / WATER_BALLOON_GALLONS
+    analogies.append({
+        "label": "Water Balloons",
+        "value": f"{balloon_count:,.0f}",
+        "emoji": "🎈",
+        "text": f"That's enough raw sewage to fill {balloon_count:,.0f} water balloons."
+    })
+
+    # Olympic Pools
+    if total_gallons >= 100_000:
+        pool_count = total_gallons / OLYMPIC_POOL_GALLONS
+        analogies.append({
+            "label": "Olympic Swimming Pools",
+            "value": f"{pool_count:,.2f}",
+            "emoji": "🏊",
+            "text": f"That's enough raw sewage to fill {pool_count:,.2f} Olympic-sized swimming pools."
+        })
+
+    # Bryant Denny Field
+    if total_gallons >= 50_000:
+        field_depth = total_gallons / BRYANT_DENNY_FOOT_DEEP_GALLONS
+        analogies.append({
+            "label": "Bryant-Denny Field Depth",
+            "value": f"{field_depth:,.2f} ft",
+            "emoji": "🏈",
+            "text": f"That's enough sewage to cover Bryant-Denny Field {field_depth:,.2f} feet deep."
+        })
+
+    return analogies

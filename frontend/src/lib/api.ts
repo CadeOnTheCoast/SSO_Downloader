@@ -3,7 +3,24 @@ export interface DashboardSummary {
     total_volume: number
     avg_volume: number
     max_volume: number
+    total_duration_hours?: number
+    distinct_utilities?: number
+    distinct_receiving_waters?: number
+    date_range?: { min: string | null; max: string | null }
     top_utilities_pie?: any[]
+    by_receiving_water?: {
+        name: string
+        total_volume: number
+        spills: number
+    }[]
+    volume_analogies?: {
+        label: string
+        value: string
+        emoji: string
+        text: string
+    }[]
+    time_series?: SeriesPoint[]
+    by_utility?: any[]
 }
 
 export interface SeriesPoint {

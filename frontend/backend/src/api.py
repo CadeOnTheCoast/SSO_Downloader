@@ -23,7 +23,8 @@ from sso_analytics import (
 )
 from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv_filelike
-from sso_schema import SSOQuery, normalize_sso_records, sso_record_to_csv_row
+from sso_schema import SSOQuery
+from sso_transform import normalize_sso_records, sso_record_to_csv_row
 from sso_volume import enrich_est_volume_fields
 from options_data import ALABAMA_COUNTIES
 
@@ -113,7 +114,7 @@ class SSOQueryParams(BaseModel):
     def to_sso_query(
         self, permit_map: Optional[dict[str, dict[str, object]]] = None
     ) -> SSOQuery:
-        county = self.county.title() if self.county else None
+        county = self.county if self.county else None
         utility_id = self.permit or self.utility_id
 
         permit_ids: Optional[list[str]] = None
@@ -137,8 +138,8 @@ class SSOQueryParams(BaseModel):
                 permit_ids = permits
 
         return SSOQuery(
-            utility_id=None if permit_ids else self.utility_id,
-            utility_name=None if permit_ids else self.utility_name,
+            utility_id=utility_id if not permit_ids else None,
+            utility_name=self.utility_name if not permit_ids else None,
             county=county,
             permit_ids=permit_ids,
             start_date=self._parse_date(self.start_date),
@@ -170,7 +171,7 @@ def health_check() -> dict[str, str]:
 def _load_options(client: SSOClient) -> dict[str, object]:
     utilities: list[dict[str, object]] = []
     permittees: list[dict[str, object]] = []
-    counties = list(DEFAULT_COUNTIES)
+    counties = ALABAMA_COUNTIES
 
     try:
         fresh_permittees = client.list_permittees()
@@ -190,13 +191,6 @@ def _load_options(client: SSOClient) -> dict[str, object]:
             {"id": item["id"], "name": item["name"], "permits": [item["id"]]}
             for item in DEFAULT_UTILITIES
         ]
-
-    try:
-        fresh_counties = client.list_counties()
-        if fresh_counties:
-            counties = fresh_counties
-    except Exception:
-        counties = list(DEFAULT_COUNTIES)
 
     return {"utilities": utilities, "permittees": permittees, "counties": counties}
 

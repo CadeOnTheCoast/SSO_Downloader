@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FilterOptions, FilterState, fetchFilters } from '@/lib/api'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Search, Calendar, MapPin, ListFilter } from 'lucide-react'
 
 interface DashboardFiltersProps {
     onFilterChange: (filters: FilterState) => void
@@ -40,38 +40,56 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     return (
         <form onSubmit={handleSubmit} className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Utility Select */}
+                {/* Utility Searchable Selection */}
+                <div className="space-y-2 lg:col-span-2">
+                    <label className="text-xs text-slate-400 font-medium">Utility / Permittee</label>
+                    <div className="relative group">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                        <input
+                            list="utility-options"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                            placeholder="Search permittee..."
+                            value={filters.utility_id || ''}
+                            onChange={(e) => handleChange('utility_id', e.target.value.split(' - ')[0] || undefined)}
+                        />
+                        <datalist id="utility-options">
+                            {options.utilities.map(u => (
+                                <option key={u.id} value={`${u.id} - ${u.name}`} />
+                            ))}
+                        </datalist>
+                    </div>
+                </div>
+
+                {/* Optional Permit ID Input */}
                 <div className="space-y-2">
-                    <label className="text-xs text-slate-400 font-medium">Utility</label>
-                    <select
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={filters.utility_id || ''}
-                        onChange={(e) => handleChange('utility_id', e.target.value || undefined)}
-                    >
-                        <option value="">All Utilities</option>
-                        {options.utilities.map(u => (
-                            <option key={u.id} value={u.id}>
-                                {u.name}
-                            </option>
-                        ))}
-                    </select>
+                    <label className="text-xs text-slate-400 font-medium">Permit ID (Optional)</label>
+                    <input
+                        type="text"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all uppercase placeholder:text-slate-600"
+                        placeholder="AL0000000"
+                        value={filters.permit || ''}
+                        onChange={(e) => handleChange('permit', e.target.value || undefined)}
+                    />
                 </div>
 
                 {/* County Select */}
                 <div className="space-y-2">
-                    <label className="text-xs text-slate-400 font-medium">County</label>
-                    <select
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={filters.county || ''}
-                        onChange={(e) => handleChange('county', e.target.value || undefined)}
-                    >
-                        <option value="">All Counties</option>
-                        {options.counties.map(c => (
-                            <option key={c} value={c}>
-                                {c}
-                            </option>
-                        ))}
-                    </select>
+                    <label className="text-xs text-slate-400 font-medium tracking-wider uppercase opacity-60">County</label>
+                    <div className="relative">
+                        <MapPin className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+                        <select
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all appearance-none cursor-pointer"
+                            value={filters.county || ''}
+                            onChange={(e) => handleChange('county', e.target.value || undefined)}
+                        >
+                            <option value="">All Counties</option>
+                            {options.counties.map(c => (
+                                <option key={c} value={c}>
+                                    {c}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 {/* Start Date */}

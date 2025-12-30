@@ -5,14 +5,18 @@ import { SSOOverview } from '@/components/dashboard/SSOOverview'
 import { SSOCharts } from '@/components/dashboard/SSOCharts'
 import { SSOTable } from '@/components/dashboard/SSOTable'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
-import { useSearchParams } from 'next/navigation'
-import { FilterState, DashboardSummary, SeriesPoint, BarGroup, SSORecord, fetchSummary, fetchSeriesByDate, fetchSeriesByUtility, fetchRecords } from '@/lib/api'
-import { createClient } from '@/lib/supabase/client' // Use client-side supbase for auth check if needed, or rely on layout/middleware
+import { createClient } from '@/lib/supabase/client'
+import {
+    FilterState,
+    DashboardSummary,
+    SeriesPoint,
+    BarGroup,
+    SSORecord,
+    fetchSummary,
+    fetchRecords
+} from '@/lib/api'
 
 export default function DashboardPage() {
-    // Auth check (basic) - assuming middleware handles protection generally, 
-    // but for username display we might need context. 
-    // For now, I'll mock the user or fetch it client side if critically needed.
     const [userEmail, setUserEmail] = useState<string>('')
     const [loading, setLoading] = useState(false)
 
@@ -22,6 +26,7 @@ export default function DashboardPage() {
     const [barGroups, setBarGroups] = useState<BarGroup[]>([])
     const [records, setRecords] = useState<SSORecord[]>([])
     const [totalRecords, setTotalRecords] = useState(0)
+    const [receivingWaters, setReceivingWaters] = useState<{ name: string, total_volume: number, spills: number }[]>([])
 
     // Filter State
     const [filters, setFilters] = useState<FilterState>({ limit: 1000 })
@@ -29,33 +34,44 @@ export default function DashboardPage() {
     const pageSize = 50
 
     useEffect(() => {
-        // Quick auth check
         const supabase = createClient()
         supabase.auth.getUser().then(({ data }) => {
             if (data.user) setUserEmail(data.user.email || 'User')
-            // else redirect('/login') // handled by middleware usually
         })
-
-        // Initial load
         handleFilterChange({})
     }, [])
 
     const handleFilterChange = async (newFilters: FilterState) => {
         setLoading(true)
         setFilters(newFilters)
-        setPage(1) // Reset page on filter change
+        setPage(1)
 
         try {
-            const [sum, time, bar, recs] = await Promise.all([
+            const [sum, recs] = await Promise.all([
                 fetchSummary(newFilters),
-                fetchSeriesByDate(newFilters),
-                fetchSeriesByUtility(newFilters),
                 fetchRecords(newFilters, 0, pageSize)
             ])
 
             setSummary(sum)
-            setTimeSeries(time.points)
-            setBarGroups(bar.bars)
+
+            // Module H/I Refactor: Use data directly from the summary payload where available
+            if (sum.time_series) {
+                setTimeSeries(sum.time_series)
+            }
+
+            if (sum.by_utility) {
+                const bars: BarGroup[] = sum.by_utility.map((u: any) => ({
+                    label: u.utility_name,
+                    count: u.spill_count,
+                    total_volume_gallons: u.total_volume
+                }))
+                setBarGroups(bars)
+            }
+
+            if (sum.by_receiving_water) {
+                setReceivingWaters(sum.by_receiving_water)
+            }
+
             setRecords(recs.records)
             setTotalRecords(recs.total)
         } catch (error) {
@@ -80,20 +96,17 @@ export default function DashboardPage() {
     }
 
     const handlePieClick = (utilityName: string) => {
-        // "click a slice and the table updates to just show spills from that utility"
-        // We update the utility_name filter (we might need to map name to ID if API requires ID, 
-        // but API supports utility_name query param).
-        // Since my filter component primarily uses ID, I might need to support name or just fill the form?
-        // For now, I'll trigger a filter update with utility_name.
-        // NOTE: The current DashboardFilters component uses ID. I should probably support Name or find ID.
-        // API supports `utility_name`.
         const updatedFilters = { ...filters, utility_name: utilityName }
         handleFilterChange(updatedFilters)
     }
 
-    const handleDownload = () => {
+    const getFullCsvUrl = () => {
         const params = new URLSearchParams(filters as any)
-        window.location.href = `/download?${params.toString()}`
+        return `/api/ssos.csv?${params.toString()}`
+    }
+
+    const handleDownload = () => {
+        window.location.href = getFullCsvUrl()
     }
 
     return (
@@ -141,6 +154,7 @@ export default function DashboardPage() {
                 <SSOCharts
                     timeSeries={timeSeries}
                     barGroups={barGroups}
+                    receivingWaters={receivingWaters}
                     onPieClick={handlePieClick}
                 />
 
@@ -149,10 +163,10 @@ export default function DashboardPage() {
                     records={records}
                     page={page}
                     onChangePage={handlePageChange}
-                    hasNextPage={records.length === pageSize} // Simple check, could use total count
+                    hasNextPage={records.length === pageSize}
+                    fullCsvUrl={getFullCsvUrl()}
                 />
             </main>
         </div>
     )
 }
-

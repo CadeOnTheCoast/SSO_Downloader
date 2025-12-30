@@ -24,7 +24,7 @@ from sso_client import SSOClient, SSOClientError
 from sso_export import write_ssos_to_csv_filelike
 from sso_schema import SSOQuery, normalize_sso_records, sso_record_to_csv_row
 from sso_volume import enrich_est_volume_fields
-from webapp.options_data import ALABAMA_COUNTIES
+from options_data import ALABAMA_COUNTIES
 
 app = FastAPI(title="SSO Downloader")
 

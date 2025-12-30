@@ -2,8 +2,8 @@ import os
 import sys
 
 # Add backend and scripts to path so imports work
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../backend/src'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../scripts'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../backend/src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
 
 from api import app
 

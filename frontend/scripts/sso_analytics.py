@@ -212,28 +212,26 @@ def summarize_volume_by_month(records: Iterable[SSORecord]) -> List[GroupVolumeS
     return _summaries_from_groups(groups)
 
 
-def time_series_by_date(records: Iterable[SSORecord]) -> List[DateSeriesPoint]:
+def time_series_by_date(records: Iterable[SSORecord]) -> List[Dict[str, Any]]:
     buckets: Dict[str, Dict[str, Any]] = {}
     for record in records:
         if not record.date_sso_began:
             continue
         key = record.date_sso_began.strftime("%Y-%m-%d")
-        bucket = buckets.setdefault(key, {"count": 0, "volumes": []})
+        bucket = buckets.setdefault(key, {"count": 0, "volume": 0.0})
         bucket["count"] += 1
-        volume = _usable_volume(record)
+        volume = _best_volume(record)
         if volume is not None:
-            bucket["volumes"].append(volume)
+            bucket["volume"] += volume
 
-    points: List[DateSeriesPoint] = []
+    points: List[Dict[str, Any]] = []
     for key in sorted(buckets.keys()):
-        volumes = buckets[key]["volumes"]
-        total_volume = float(sum(volumes)) if volumes else 0.0
         points.append(
-            DateSeriesPoint(
-                date=key,
-                count=buckets[key]["count"],
-                total_volume_gallons=total_volume,
-            )
+            {
+                "date": key,
+                "count": buckets[key]["count"],
+                "volume": buckets[key]["volume"],
+            }
         )
     return points
 
@@ -412,42 +410,45 @@ def _date_bounds(records: Sequence[SSORecord]) -> tuple[Optional[datetime], Opti
 
 
 def build_time_series(records: Sequence[SSORecord]) -> Dict[str, Any]:
+    """Build time series with automatic granularity based on date span."""
     min_date, max_date = _date_bounds(records)
     if not min_date or not max_date:
         return {"granularity": "none", "points": []}
 
     span_days = (max_date.date() - min_date.date()).days
-    if span_days < 60:
-        return {"granularity": "none", "points": []}
-
-    if min_date.year != max_date.year:
+    
+    # Automatic granularity
+    if span_days > 730: # 2+ years
         granularity = "year"
-    else:
+    elif span_days > 90: # 3+ months
         granularity = "month"
+    else:
+        granularity = "day"
 
     buckets: dict[str, dict[str, Any]] = {}
     for record in records:
         if not record.date_sso_began:
             continue
         dt = record.date_sso_began
+        
         if granularity == "year":
             key = str(dt.year)
-            period_start = datetime(dt.year, 1, 1)
-        else:
+        elif granularity == "month":
             key = f"{dt.year:04d}-{dt.month:02d}"
-            period_start = datetime(dt.year, dt.month, 1)
+        else:
+            key = dt.strftime("%Y-%m-%d")
+
         bucket = buckets.setdefault(
             key,
             {
-                "period_label": key,
-                "period_start": period_start.date().isoformat(),
-                "spill_count": 0,
-                "total_volume_gallons": 0.0,
+                "date": key,
+                "count": 0,
+                "volume": 0.0,
             },
         )
-        bucket["spill_count"] += 1
+        bucket["count"] += 1
         volume = _best_volume(record)
-        bucket["total_volume_gallons"] += volume if volume is not None else 0.0
+        bucket["volume"] += volume if volume is not None else 0.0
 
     points = [buckets[key] for key in sorted(buckets.keys())]
     return {"granularity": granularity, "points": points}

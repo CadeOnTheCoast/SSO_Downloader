@@ -357,7 +357,7 @@ def series_by_date(
     records_norm = normalize_sso_records(raw_records)
     series = time_series_by_date(records_norm)
 
-    return {"points": [asdict(point) for point in series]}
+    return {"points": series}
 
 
 @app.get("/series/by_utility")

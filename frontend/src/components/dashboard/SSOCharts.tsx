@@ -130,7 +130,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     fill="#8884d8"
                                     onClick={(data) => onPieClick && onPieClick(data.label)}
                                     cursor="pointer"
-                                    label={({ name, percent }) => `${getUtilitySlug(name || '')} ${(percent * 100).toFixed(0)}%`}
+                                    label={({ name, percent }) => `${getUtilitySlug(name || '')} ${((percent || 0) * 100).toFixed(0)}%`}
                                 >
                                     {barGroups.slice(0, 5).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

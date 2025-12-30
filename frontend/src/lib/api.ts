@@ -55,10 +55,13 @@ export interface FilterOptions {
 
 export interface FilterState {
     utility_id?: string
+    utility_name?: string
+    permit?: string
     county?: string
     start_date?: string
     end_date?: string
     limit?: number
+    offset?: number
 }
 
 export async function fetchFilters(): Promise<FilterOptions> {

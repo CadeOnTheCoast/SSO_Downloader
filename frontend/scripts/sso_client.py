@@ -62,7 +62,12 @@ class SSOClient:
 
         # SSL Configuration
         self.verify: bool | str = True
-        if os.getenv("VERIFY_SSL", "").lower() == "false":
+        
+        # If REQUESTS_CA_BUNDLE is set, let requests handle it (defaults to verify=True)
+        # This takes precedence over our custom search logic.
+        if os.getenv("REQUESTS_CA_BUNDLE"):
+            pass
+        elif os.getenv("VERIFY_SSL", "").lower() == "false":
             self.verify = False
         else:
             # Look for the ADEM CA chain in multiple possible locations

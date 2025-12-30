@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts"
 import { SeriesPoint, BarGroup } from "@/lib/api"
+import type { ValueType } from "recharts/types/component/DefaultTooltipContent"
 
 interface SSOChartsProps {
     timeSeries: SeriesPoint[]
@@ -119,7 +120,23 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
                                     itemStyle={{ color: '#e2e8f0' }}
-                                    formatter={(value: number) => value.toLocaleString() + ' gal'}
+                                    formatter={(value: ValueType) => {
+                                        if (Array.isArray(value)) {
+                                            const firstValue = value[0]
+                                            return `${typeof firstValue === 'number' ? firstValue.toLocaleString() : firstValue ?? 0} gal`
+                                        }
+
+                                        if (typeof value === 'number') {
+                                            return `${value.toLocaleString()} gal`
+                                        }
+
+                                        if (typeof value === 'string') {
+                                            const numeric = Number(value)
+                                            return `${Number.isNaN(numeric) ? value : numeric.toLocaleString()} gal`
+                                        }
+
+                                        return '0 gal'
+                                    }}
                                 />
                                 <Legend />
                             </PieChart>

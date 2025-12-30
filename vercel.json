@@ -1,37 +1,18 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/ssos",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/api/ssos.csv",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/api/options",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/summary",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/series/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/records",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/filters",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/download",
-      "destination": "/api/index.py"
-    }
+  "version": 2,
+  "routes": [
+    { "src": "/api/ssos", "dest": "/api/index.py" },
+    { "src": "/api/ssos.csv", "dest": "/api/index.py" },
+    { "src": "/api/options", "dest": "/api/index.py" },
+    { "src": "/api/ssos/summary", "dest": "/api/index.py" },
+    { "src": "/health", "dest": "/api/index.py" },
+    { "src": "/summary", "dest": "/api/index.py" },
+    { "src": "/series/(.*)", "dest": "/api/index.py" },
+    { "src": "/records", "dest": "/api/index.py" },
+    { "src": "/filters", "dest": "/api/index.py" },
+    { "src": "/download", "dest": "/api/index.py" },
+    { "src": "/dashboard", "dest": "/api/index.py" },
+    { "src": "/(.*)", "dest": "/frontend/$1" }
   ],
   "builds": [
     {

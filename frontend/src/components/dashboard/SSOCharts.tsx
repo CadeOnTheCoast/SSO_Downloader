@@ -112,6 +112,8 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                                     label
                                     onClick={(data) => onPieClick && onPieClick(data.label)}
                                     cursor="pointer"
+                                    animationBegin={0}
+                                    animationDuration={1500}
                                 >
                                     {barGroups.slice(0, 5).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

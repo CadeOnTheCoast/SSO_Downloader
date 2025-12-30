@@ -9,7 +9,6 @@ interface SSOChartsProps {
     timeSeries: SeriesPoint[]
     barGroups: BarGroup[]
     receivingWaters?: { name: string, total_volume: number, spills: number }[]
-    pieData?: { name: string, value: number }[]
     onPieClick?: (utilityName: string) => void
 }
 

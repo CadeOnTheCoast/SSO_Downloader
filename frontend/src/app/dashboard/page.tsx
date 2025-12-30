@@ -60,7 +60,7 @@ export default function DashboardPage() {
             }
 
             if (sum.by_utility) {
-                const bars: BarGroup[] = sum.by_utility.map((u: any) => ({
+                const bars: BarGroup[] = sum.by_utility.map((u: { utility_name: string; spill_count: number; total_volume: number }) => ({
                     label: u.utility_name,
                     count: u.spill_count,
                     total_volume_gallons: u.total_volume
@@ -101,7 +101,10 @@ export default function DashboardPage() {
     }
 
     const getFullCsvUrl = () => {
-        const params = new URLSearchParams(filters as any)
+        const params = new URLSearchParams()
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined) params.append(key, value.toString())
+        })
         return `/api/ssos.csv?${params.toString()}`
     }
 

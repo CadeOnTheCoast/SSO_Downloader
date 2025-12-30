@@ -27,6 +27,10 @@ function formatDate(dateStr: string | null | undefined): string {
     return new Date(dateStr).toLocaleDateString();
 }
 
+interface SSOOverviewProps {
+    summary: DashboardSummary | null;
+}
+
 export function SSOOverview({ summary }: SSOOverviewProps) {
     if (!summary) return null;
 

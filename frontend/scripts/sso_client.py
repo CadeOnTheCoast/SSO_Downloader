@@ -63,35 +63,54 @@ class SSOClient:
         # SSL Configuration
         self.verify: bool | str = True
         
-        # If REQUESTS_CA_BUNDLE is set, let requests handle it (defaults to verify=True)
-        # This takes precedence over our custom search logic.
-        if os.getenv("REQUESTS_CA_BUNDLE"):
-            pass
+        # Priority 1: REQUESTS_CA_BUNDLE environment variable
+        env_bundle = os.getenv("REQUESTS_CA_BUNDLE")
+        if env_bundle:
+            if os.path.exists(env_bundle):
+                self.verify = env_bundle
+                logger.info(f"Using SSL CA bundle from REQUESTS_CA_BUNDLE: {env_bundle}")
+            else:
+                logger.warning(f"REQUESTS_CA_BUNDLE set but path does not exist: {env_bundle}")
+
+        # Priority 2: VERIFY_SSL explicitly disabled
         elif os.getenv("VERIFY_SSL", "").lower() == "false":
             self.verify = False
+            logger.warning("SSL verification is explicitly disabled via VERIFY_SSL=false")
+        
         else:
-            # Look for the ADEM CA chain in multiple possible locations
+            # Priority 3: Search for ADEM CA chain in known locations
             script_dir = os.path.dirname(os.path.abspath(__file__))
+            repo_root = os.path.abspath(os.path.join(script_dir, ".."))
+            
             cert_paths = [
-                os.path.join(script_dir, "adem_ca_chain.pem"),
-                os.path.join(script_dir, "..", "adem_ca_chain.pem"),
-                os.path.join(script_dir, "..", "api", "adem_ca_chain.pem"),
+                os.path.join(script_dir, "adem_ca_chain.pem"), # scripts/adem_ca_chain.pem
+                os.path.join(repo_root, "adem_ca_chain.pem"),  # root/adem_ca_chain.pem
+                os.path.join(repo_root, "frontend", "adem_ca_chain.pem"), # frontend/adem_ca_chain.pem
+                os.path.join(repo_root, "api", "adem_ca_chain.pem"), # api/adem_ca_chain.pem
+                os.path.join(repo_root, "frontend", "api", "adem_ca_chain.pem"), # frontend/api/adem_ca_chain.pem
+                "/var/task/adem_ca_chain.pem",
                 "/var/task/api/adem_ca_chain.pem",
-                "/var/task/scripts/adem_ca_chain.pem",
-                "/var/task/backend/src/adem_ca_chain.pem",
+                "/var/task/frontend/adem_ca_chain.pem",
                 "adem_ca_chain.pem",
             ]
+            
             cert_found = False
             for path in cert_paths:
                 if os.path.exists(path):
                     self.verify = path
+                    logger.info(f"Using ADEM CA chain found at: {path}")
                     cert_found = True
                     break
             
-            # If no cert found in serverless environment, disable verification
-            # This is necessary because the ADEM server uses a non-standard CA
-            if not cert_found and os.path.exists("/var/task"):
-                self.verify = False
+            if not cert_found:
+                # Fallback: In Vercel (/var/task exists), if we can't find our cert, 
+                # we might have to disable verification or rely on system (which likely fails).
+                if os.path.exists("/var/task"):
+                    logger.error("Running on Vercel but adem_ca_chain.pem not found in any search path!")
+                    # We'll leave self.verify = True (system default) but it will likely fail 
+                    # if the server is still misconfigured.
+                else:
+                    logger.debug("No custom CA chain found; using system defaults.")
 
     def _get(self, params: Dict[str, Any], *, url: Optional[str] = None) -> Dict[str, Any]:
         response = self.session.get(

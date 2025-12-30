@@ -23,7 +23,7 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                     <CardTitle className="text-slate-200 text-lg">Spills Over Time</CardTitle>
                 </CardHeader>
                 <CardContent className="pl-2">
-                    <div className="h-[300px] w-full">
+                    <div className="h-[300px] min-h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={timeSeries}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -65,7 +65,7 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                     <CardTitle className="text-slate-200 text-lg">Volume by Utility (Top 10)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="h-[300px] w-full">
+                    <div className="h-[300px] min-h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={barGroups.slice(0, 10)} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
@@ -83,7 +83,7 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                                     cursor={{ fill: '#1e293b' }}
                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
                                     itemStyle={{ color: '#e2e8f0' }}
-                                    formatter={(value: any) => value.toLocaleString()}
+                                    formatter={(value: any) => (value ?? 0).toLocaleString()}
                                 />
                                 <Bar dataKey="total_volume_gallons" fill="#10b981" radius={[0, 4, 4, 0]} />
                             </BarChart>
@@ -98,7 +98,7 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                     <CardTitle className="text-slate-200 text-lg">High Volume Sources</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="h-[300px] w-full">
+                    <div className="h-[300px] min-h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie

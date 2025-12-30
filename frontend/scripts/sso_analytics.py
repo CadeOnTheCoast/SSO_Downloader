@@ -281,8 +281,8 @@ def summarize_by_month(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
     for month in sorted(buckets.keys()):
         volumes = buckets[month]["volumes"]
         total_volume = float(sum(volumes)) if volumes else 0.0
-        avg_volume = mean(volumes) if volumes else None
-        max_volume = max(volumes) if volumes else None
+        avg_volume = mean(volumes) if volumes else 0.0
+        max_volume = max(volumes) if volumes else 0.0
         rows.append(
             {
                 "month": month,
@@ -557,8 +557,8 @@ def build_dashboard_summary(
 
     volumes = [vol for vol in (_best_volume(record) for record in records) if vol is not None]
     total_volume = float(sum(volumes)) if volumes else 0.0
-    avg_volume = mean(volumes) if volumes else None
-    max_volume = max(volumes) if volumes else None
+    avg_volume = mean(volumes) if volumes else 0.0
+    max_volume = max(volumes) if volumes else 0.0
 
     utilities = set()
     receiving_waters = set()

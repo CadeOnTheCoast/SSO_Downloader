@@ -43,7 +43,7 @@ export function SSOTable({ records, page = 1, onChangePage, hasNextPage = false 
                                         {record.date_sso_began ? new Date(record.date_sso_began).toLocaleDateString() : 'N/A'}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        {record.volume_gallons?.toLocaleString()}
+                                        {(record.volume_gallons ?? 0).toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4 max-w-[200px] truncate" title={record.cause}>
                                         {record.cause}

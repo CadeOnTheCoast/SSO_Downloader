@@ -31,25 +31,25 @@ export function SSOOverview({ summary }: SSOOverviewProps) {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
                 title="Total Spills"
-                value={summary.total_count}
+                value={summary.total_count ?? 0}
                 icon={Activity}
                 subtext="In selected period"
             />
             <StatCard
                 title="Total Volume"
-                value={summary.total_volume.toLocaleString()}
+                value={(summary.total_volume ?? 0).toLocaleString()}
                 icon={Droplets}
                 subtext="Gallons"
             />
             <StatCard
                 title="Avg Volume"
-                value={Math.round(summary.avg_volume).toLocaleString()}
+                value={Math.round(summary.avg_volume ?? 0).toLocaleString()}
                 icon={AlertTriangle}
                 subtext="Gallons per spill"
             />
             <StatCard
                 title="Max Volume"
-                value={summary.max_volume.toLocaleString()}
+                value={(summary.max_volume ?? 0).toLocaleString()}
                 icon={AlertTriangle}
                 subtext="Largest single spill"
             />

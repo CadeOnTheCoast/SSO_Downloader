@@ -93,7 +93,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tickFormatter={(value) => getUtilitySlug(value)}
+                                    tickFormatter={(value) => getUtilitySlug(value || '')}
                                 />
                                 <Tooltip
                                     cursor={{ fill: '#1e293b' }}
@@ -101,7 +101,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     itemStyle={{ color: '#e2e8f0' }}
                                     formatter={(value: any, name: any, props: any) => [
                                         `${(value ?? 0).toLocaleString()} gal`,
-                                        props.payload.label
+                                        props.payload.label || 'Unknown'
                                     ]}
                                 />
                                 <Bar dataKey="total_volume_gallons" fill="#3b82f6" radius={[0, 4, 4, 0]} />
@@ -130,7 +130,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     fill="#8884d8"
                                     onClick={(data) => onPieClick && onPieClick(data.label)}
                                     cursor="pointer"
-                                    label={({ name, percent }) => `${getUtilitySlug(name)} ${(percent * 100).toFixed(0)}%`}
+                                    label={({ name, percent }) => `${getUtilitySlug(name || '')} ${(percent * 100).toFixed(0)}%`}
                                 >
                                     {barGroups.slice(0, 5).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -141,14 +141,14 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     itemStyle={{ color: '#e2e8f0' }}
                                     formatter={(value: any, name: any) => {
                                         const pct = totalVolume > 0 ? ((value / totalVolume) * 100).toFixed(1) : 0;
-                                        return [`${(value ?? 0).toLocaleString()} gal (${pct}%)`, name];
+                                        return [`${(value ?? 0).toLocaleString()} gal (${pct}%)`, name || 'Unknown'];
                                     }}
                                 />
                                 <Legend
                                     verticalAlign="bottom"
                                     height={36}
                                     wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
-                                    formatter={(value) => getUtilitySlug(value)}
+                                    formatter={(value) => getUtilitySlug(value || '')}
                                 />
                             </PieChart>
                         </ResponsiveContainer>

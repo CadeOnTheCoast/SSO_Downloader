@@ -120,10 +120,19 @@ export function SSOCharts({ timeSeries, barGroups, pieData, onPieClick }: SSOCha
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
                                     itemStyle={{ color: '#e2e8f0' }}
-                                    formatter={(value: ValueType) => {
+                                    formatter={(value?: ValueType) => {
                                         if (Array.isArray(value)) {
                                             const firstValue = value[0]
-                                            return `${typeof firstValue === 'number' ? firstValue.toLocaleString() : firstValue ?? 0} gal`
+                                            if (typeof firstValue === 'number') {
+                                                return `${firstValue.toLocaleString()} gal`
+                                            }
+
+                                            if (typeof firstValue === 'string') {
+                                                const numeric = Number(firstValue)
+                                                return `${Number.isNaN(numeric) ? firstValue : numeric.toLocaleString()} gal`
+                                            }
+
+                                            return '0 gal'
                                         }
 
                                         if (typeof value === 'number') {

@@ -65,16 +65,28 @@ class SSOClient:
         if os.getenv("VERIFY_SSL", "").lower() == "false":
             self.verify = False
         else:
-            # Look for the internal ADEM CA chain
+            # Look for the ADEM CA chain in multiple possible locations
+            script_dir = os.path.dirname(os.path.abspath(__file__))
             cert_paths = [
-                os.path.join(os.path.dirname(__file__), "adem_ca_chain.pem"),
-                os.path.join(os.path.dirname(__file__), "../adem_ca_chain.pem"),
-                "adem_ca_chain.pem"
+                os.path.join(script_dir, "adem_ca_chain.pem"),
+                os.path.join(script_dir, "..", "adem_ca_chain.pem"),
+                os.path.join(script_dir, "..", "api", "adem_ca_chain.pem"),
+                "/var/task/api/adem_ca_chain.pem",
+                "/var/task/scripts/adem_ca_chain.pem",
+                "/var/task/backend/src/adem_ca_chain.pem",
+                "adem_ca_chain.pem",
             ]
+            cert_found = False
             for path in cert_paths:
                 if os.path.exists(path):
                     self.verify = path
+                    cert_found = True
                     break
+            
+            # If no cert found in serverless environment, disable verification
+            # This is necessary because the ADEM server uses a non-standard CA
+            if not cert_found and os.path.exists("/var/task"):
+                self.verify = False
 
     def _get(self, params: Dict[str, Any], *, url: Optional[str] = None) -> Dict[str, Any]:
         response = self.session.get(

@@ -278,7 +278,6 @@ def download_csv(
 
 
 def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
-    _ensure_filters(params)
     query = _to_query(params, client)
     try:
         query.validate()
@@ -330,7 +329,6 @@ def series_by_date(
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
-    _ensure_filters(params)
     query = _to_query(params, client)
     try:
         query.validate()
@@ -353,7 +351,6 @@ def series_by_utility(
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
-    _ensure_filters(params)
     query = _to_query(params, client)
     try:
         query.validate()
@@ -397,7 +394,6 @@ def _fetch_normalized_records(
 ):
     """Shared record fetching logic for JSON table endpoints."""
 
-    _ensure_filters(params)
     query = _to_query(params, client)
     try:
         query.validate()

@@ -28,6 +28,18 @@ from options_data import ALABAMA_COUNTIES
 
 app = FastAPI(title="SSO Downloader")
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "traceback": traceback.format_exc(),
+            "type": type(exc).__name__
+        }
+    )
+
 MAX_WEB_RECORDS = 20000
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"

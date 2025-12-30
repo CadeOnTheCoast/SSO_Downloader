@@ -166,64 +166,6 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/debug/ssl")
-def debug_ssl():
-    import ssl
-    import os
-    import requests
-    import certifi
-    
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Assuming we are in /var/task/backend/src or /var/task/api
-    # Let's check common locations
-    checks = {
-        "cwd": os.getcwd(),
-        "script_dir": script_dir,
-        "python_version": sys.version,
-        "openssl_version": ssl.OPENSSL_VERSION,
-        "certifi_where": certifi.where(),
-        "env_ca_bundle": os.getenv("REQUESTS_CA_BUNDLE"),
-        "env_verify_ssl": os.getenv("VERIFY_SSL"),
-        "files": {}
-    }
-    
-    potential_paths = [
-        "adem_ca_chain.pem",
-        "/var/task/adem_ca_chain.pem",
-        "/var/task/api/adem_ca_chain.pem",
-        "/var/task/frontend/api/adem_ca_chain.pem",
-        os.path.join(script_dir, "adem_ca_chain.pem"),
-        os.path.join(script_dir, "..", "adem_ca_chain.pem"),
-        os.path.join(script_dir, "..", "..", "adem_ca_chain.pem"),
-    ]
-    
-    for p in potential_paths:
-        abs_p = os.path.abspath(p)
-        exists = os.path.exists(abs_p)
-        checks["files"][p] = {
-            "abs": abs_p,
-            "exists": exists,
-            "readable": os.access(abs_p, os.R_OK) if exists else False,
-            "size": os.path.getsize(abs_p) if exists else 0
-        }
-        
-        if exists:
-            try:
-                # Try connection with THIS specific bundle
-                requests.get("https://gis.adem.alabama.gov", verify=abs_p, timeout=3)
-                checks["files"][p]["test_connection"] = "SUCCESS"
-            except Exception as e:
-                checks["files"][p]["test_connection"] = f"FAILED: {type(e).__name__}: {str(e)}"
-        
-    # Try a dry connect with certifi
-    try:
-        requests.get("https://gis.adem.alabama.gov", timeout=3)
-        checks["connection_default"] = "Success"
-    except Exception as e:
-        checks["connection_default"] = f"Failed: {type(e).__name__}: {str(e)}"
-        
-    return checks
-
 
 def _load_options(client: SSOClient) -> dict[str, object]:
     utilities: list[dict[str, object]] = []

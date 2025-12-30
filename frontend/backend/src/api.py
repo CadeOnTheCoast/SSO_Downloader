@@ -199,20 +199,28 @@ def debug_ssl():
     
     for p in potential_paths:
         abs_p = os.path.abspath(p)
+        exists = os.path.exists(abs_p)
         checks["files"][p] = {
             "abs": abs_p,
-            "exists": os.path.exists(abs_p),
-            "readable": os.access(abs_p, os.R_OK) if os.path.exists(abs_p) else False,
-            "size": os.path.getsize(abs_p) if os.path.exists(abs_p) else 0
+            "exists": exists,
+            "readable": os.access(abs_p, os.R_OK) if exists else False,
+            "size": os.path.getsize(abs_p) if exists else 0
         }
         
-    # Try a dry connect to see the error in detail
+        if exists:
+            try:
+                # Try connection with THIS specific bundle
+                requests.get("https://gis.adem.alabama.gov", verify=abs_p, timeout=3)
+                checks["files"][p]["test_connection"] = "SUCCESS"
+            except Exception as e:
+                checks["files"][p]["test_connection"] = f"FAILED: {type(e).__name__}: {str(e)}"
+        
+    # Try a dry connect with certifi
     try:
-        # Use a very short timeout
-        requests.get("https://gis.adem.alabama.gov", timeout=2)
-        checks["connection"] = "Success (system store)"
+        requests.get("https://gis.adem.alabama.gov", timeout=3)
+        checks["connection_default"] = "Success"
     except Exception as e:
-        checks["connection"] = f"Failed: {type(e).__name__}: {str(e)}"
+        checks["connection_default"] = f"Failed: {type(e).__name__}: {str(e)}"
         
     return checks
 

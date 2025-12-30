@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import sys
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -163,6 +164,57 @@ def create_app() -> FastAPI:
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/debug/ssl")
+def debug_ssl():
+    import ssl
+    import os
+    import requests
+    import certifi
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Assuming we are in /var/task/backend/src or /var/task/api
+    # Let's check common locations
+    checks = {
+        "cwd": os.getcwd(),
+        "script_dir": script_dir,
+        "python_version": sys.version,
+        "openssl_version": ssl.OPENSSL_VERSION,
+        "certifi_where": certifi.where(),
+        "env_ca_bundle": os.getenv("REQUESTS_CA_BUNDLE"),
+        "env_verify_ssl": os.getenv("VERIFY_SSL"),
+        "files": {}
+    }
+    
+    potential_paths = [
+        "adem_ca_chain.pem",
+        "/var/task/adem_ca_chain.pem",
+        "/var/task/api/adem_ca_chain.pem",
+        "/var/task/frontend/api/adem_ca_chain.pem",
+        os.path.join(script_dir, "adem_ca_chain.pem"),
+        os.path.join(script_dir, "..", "adem_ca_chain.pem"),
+        os.path.join(script_dir, "..", "..", "adem_ca_chain.pem"),
+    ]
+    
+    for p in potential_paths:
+        abs_p = os.path.abspath(p)
+        checks["files"][p] = {
+            "abs": abs_p,
+            "exists": os.path.exists(abs_p),
+            "readable": os.access(abs_p, os.R_OK) if os.path.exists(abs_p) else False,
+            "size": os.path.getsize(abs_p) if os.path.exists(abs_p) else 0
+        }
+        
+    # Try a dry connect to see the error in detail
+    try:
+        # Use a very short timeout
+        requests.get("https://gis.adem.alabama.gov", timeout=2)
+        checks["connection"] = "Success (system store)"
+    except Exception as e:
+        checks["connection"] = f"Failed: {type(e).__name__}: {str(e)}"
+        
+    return checks
 
 
 def _load_options(client: SSOClient) -> dict[str, object]:

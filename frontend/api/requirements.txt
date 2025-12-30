@@ -1,6 +1,8 @@
-requests
 fastapi
 uvicorn
 Jinja2
 httpx
 pytest
+pydantic
+python-multipart
+requests

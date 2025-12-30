@@ -7,11 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, validator
 
 from sso_analytics import (
     build_dashboard_summary,
@@ -63,6 +63,12 @@ class SSOQueryParams(BaseModel):
         default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
     )
     limit: Optional[int] = Field(default=None, ge=1, le=50000)
+
+    @validator("utility_id", "utility_name", "permit", "county", pre=True)
+    def _handle_undefined(cls, value):
+        if value in ("undefined", "null", ""):
+            return None
+        return value
 
     @field_validator("start_date", "end_date")
     def _validate_date(cls, value: Optional[str]):

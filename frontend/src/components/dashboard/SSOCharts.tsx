@@ -39,6 +39,13 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                         <div className="h-[300px] min-h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={timeSeries}>
+                                    <defs>
+                                        <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#BA4A3E" stopOpacity={0.8} />
+                                            <stop offset="50%" stopColor="#DAA520" stopOpacity={0.6} />
+                                            <stop offset="100%" stopColor="#4AA0AF" stopOpacity={0.8} />
+                                        </linearGradient>
+                                    </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
                                     <XAxis
                                         dataKey="date"
@@ -62,10 +69,10 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     <Line
                                         type="monotone"
                                         dataKey="count"
-                                        stroke="#4AA0AF"
+                                        stroke="url(#lineGradient)"
                                         strokeWidth={3}
                                         dot={false}
-                                        activeDot={{ r: 6, fill: '#4AA0AF', strokeWidth: 2, stroke: '#fff' }}
+                                        activeDot={{ r: 6, fill: '#BA4A3E', strokeWidth: 2, stroke: '#fff' }}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>

@@ -62,6 +62,8 @@ export interface FilterState {
     end_date?: string
     limit?: number
     offset?: number
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
 }
 
 export async function fetchFilters(): Promise<FilterOptions> {
@@ -91,8 +93,20 @@ export async function fetchSeriesByUtility(filters: FilterState): Promise<{ bars
     return res.json()
 }
 
-export async function fetchRecords(filters: FilterState, offset: number = 0, limit: number = 50): Promise<{ records: SSORecord[], total: number }> {
-    const params = new URLSearchParams({ ...filters, offset: offset.toString(), limit: limit.toString() } as any)
+export async function fetchRecords(
+    filters: FilterState,
+    offset: number = 0,
+    limit: number = 50,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc'
+): Promise<{ records: SSORecord[], total: number }> {
+    const params = new URLSearchParams({
+        ...filters,
+        offset: offset.toString(),
+        limit: limit.toString(),
+        ...(sortBy && { sort_by: sortBy }),
+        ...(sortOrder && { sort_order: sortOrder })
+    } as any)
     const res = await fetch(`/records?${params.toString()}`)
     if (!res.ok) throw new Error('Failed to fetch records')
     return res.json()

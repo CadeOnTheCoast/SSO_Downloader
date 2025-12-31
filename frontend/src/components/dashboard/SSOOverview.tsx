@@ -63,14 +63,14 @@ export function SSOOverview({ summary }: SSOOverviewProps) {
                     </div>
                 </div>
 
-                <div className="bg-white border border-brand-sage/20 rounded-lg p-8 flex flex-col items-center text-center shadow-sm group hover:border-brand-sage transition-all">
-                    <div className="h-12 w-12 rounded-full bg-brand-sage/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Droplets className="h-6 w-6 text-brand-sage" />
+                <div className="bg-white border border-brand-terracotta/20 rounded-lg p-8 flex flex-col items-center text-center shadow-sm group hover:border-brand-terracotta transition-all">
+                    <div className="h-12 w-12 rounded-full bg-brand-terracotta/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Droplets className="h-6 w-6 text-brand-terracotta" />
                     </div>
                     <div className="text-5xl font-heading font-bold text-brand-charcoal mb-2">{summary.total_volume.toLocaleString()}</div>
                     <div className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-[0.2em]">Gallons of raw sewage</div>
-                    <div className="mt-4 pt-4 border-t border-brand-sage/10 w-full text-xs text-brand-charcoal/60">
-                        Avg <span className="text-brand-charcoal font-bold">{gallonsPerHour}</span> gal/hour
+                    <div className="mt-4 pt-4 border-t border-brand-terracotta/10 w-full text-xs text-brand-charcoal/60">
+                        Avg <span className="text-brand-terracotta font-bold">{gallonsPerHour}</span> gal/hour
                     </div>
                 </div>
 

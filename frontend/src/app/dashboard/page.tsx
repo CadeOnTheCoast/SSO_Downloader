@@ -29,8 +29,10 @@ export default function DashboardPage() {
     const [receivingWaters, setReceivingWaters] = useState<{ name: string, total_volume: number, spills: number }[]>([])
 
     // Filter State
-    const [filters, setFilters] = useState<FilterState>({ limit: 1000 })
+    const [filters, setFilters] = useState<FilterState>({ limit: 2000 })
     const [page, setPage] = useState(1)
+    const [sortBy, setSortBy] = useState<string>('volume_gallons')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     const pageSize = 50
 
     useEffect(() => {
@@ -47,7 +49,7 @@ export default function DashboardPage() {
         handleFilterChange({
             start_date: startOfYear,
             end_date: today,
-            limit: 1000
+            limit: 2000
         })
     }, [])
 
@@ -59,7 +61,7 @@ export default function DashboardPage() {
         try {
             const [sum, recs] = await Promise.all([
                 fetchSummary(newFilters),
-                fetchRecords(newFilters, 0, pageSize)
+                fetchRecords(newFilters, 0, pageSize, sortBy, sortOrder)
             ])
 
             setSummary(sum)
@@ -96,7 +98,7 @@ export default function DashboardPage() {
         setPage(newPage)
         const offset = (newPage - 1) * pageSize
         try {
-            const recs = await fetchRecords(filters, offset, pageSize)
+            const recs = await fetchRecords(filters, offset, pageSize, sortBy, sortOrder)
             setRecords(recs.records)
         } catch (error) {
             console.error("Pagination error:", error)
@@ -108,6 +110,21 @@ export default function DashboardPage() {
     const handlePieClick = (utilityName: string) => {
         const updatedFilters = { ...filters, utility_name: utilityName }
         handleFilterChange(updatedFilters)
+    }
+
+    const handleSortChange = async (key: string, direction: 'asc' | 'desc') => {
+        setSortBy(key)
+        setSortOrder(direction)
+        setLoading(true)
+        setPage(1)
+        try {
+            const recs = await fetchRecords(filters, 0, pageSize, key, direction)
+            setRecords(recs.records)
+        } catch (error) {
+            console.error("Sort error:", error)
+        } finally {
+            setLoading(false)
+        }
     }
 
     const getFullCsvUrl = () => {
@@ -131,7 +148,7 @@ export default function DashboardPage() {
                             <span className="font-heading font-bold text-white text-xl">M</span>
                         </div>
                         <h1 className="text-2xl font-heading font-bold text-brand-charcoal tracking-wider">
-                            MOBILE BAYKEEPER <span className="text-brand-teal">SSO</span>
+                            Mobile Baykeeper <span className="text-brand-teal">SSO Explorer V5</span>
                         </h1>
                     </div>
                     <div className="flex items-center gap-4">
@@ -176,6 +193,9 @@ export default function DashboardPage() {
                     records={records}
                     page={page}
                     onChangePage={handlePageChange}
+                    onSortChange={handleSortChange}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
                     hasNextPage={records.length === pageSize}
                     fullCsvUrl={getFullCsvUrl()}
                 />

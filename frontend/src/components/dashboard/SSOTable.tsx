@@ -6,6 +6,9 @@ interface SSOTableProps {
     records: SSORecord[]
     page?: number
     onChangePage?: (newPage: number) => void
+    onSortChange?: (key: string, direction: 'asc' | 'desc') => void
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
     hasNextPage?: boolean
     fullCsvUrl?: string
 }
@@ -15,42 +18,22 @@ type SortConfig = {
     direction: 'asc' | 'desc'
 }
 
-export function SSOTable({ records, page = 1, onChangePage, hasNextPage = false, fullCsvUrl }: SSOTableProps) {
-    const [sortConfig, setSortConfig] = useState<SortConfig | null>({
-        key: 'volume_gallons',
-        direction: 'desc'
-    })
-
+export function SSOTable({
+    records,
+    page = 1,
+    onChangePage,
+    onSortChange,
+    sortBy = 'volume_gallons',
+    sortOrder = 'desc',
+    hasNextPage = false,
+    fullCsvUrl
+}: SSOTableProps) {
     const handleSort = (key: keyof SSORecord) => {
-        let direction: 'asc' | 'desc' = 'asc'
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc'
-        }
-        setSortConfig({ key, direction })
+        const newDirection: 'asc' | 'desc' =
+            sortBy === key && sortOrder === 'asc' ? 'desc' : 'asc'
+        onSortChange?.(key, newDirection)
     }
 
-    const sortedRecords = useMemo(() => {
-        if (!sortConfig) return records
-
-        return [...records].sort((a, b) => {
-            const aVal = a[sortConfig.key]
-            const bVal = b[sortConfig.key]
-
-            if (aVal === bVal) return 0
-            if (aVal === null || aVal === undefined) return 1
-            if (bVal === null || bVal === undefined) return -1
-
-            if (typeof aVal === 'string' && typeof bVal === 'string') {
-                return sortConfig.direction === 'asc'
-                    ? aVal.localeCompare(bVal)
-                    : bVal.localeCompare(aVal)
-            }
-
-            return sortConfig.direction === 'asc'
-                ? (aVal as any) - (bVal as any)
-                : (bVal as any) - (aVal as any)
-        })
-    }, [records, sortConfig])
 
     if (!records.length) {
         return (
@@ -61,8 +44,8 @@ export function SSOTable({ records, page = 1, onChangePage, hasNextPage = false,
     }
 
     const SortIcon = ({ column }: { column: keyof SSORecord }) => {
-        if (sortConfig?.key !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-20" />
-        return sortConfig.direction === 'asc'
+        if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-20" />
+        return sortOrder === 'asc'
             ? <ChevronUp className="h-3 w-3 ml-1 text-brand-teal" />
             : <ChevronDown className="h-3 w-3 ml-1 text-brand-teal" />
     }
@@ -113,7 +96,7 @@ export function SSOTable({ records, page = 1, onChangePage, hasNextPage = false,
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-brand-sage/5">
-                            {sortedRecords.map((record) => {
+                            {records.map((record) => {
                                 const vol = record.volume_gallons ?? 0;
                                 // Infographic Heatmap Coloring
                                 let volClass = "text-brand-charcoal";

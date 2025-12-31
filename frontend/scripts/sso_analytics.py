@@ -55,25 +55,42 @@ VOLUME_BUCKETS: List[tuple[float, Optional[float]]] = [
     (100_000, None),
 ]
 
-RECEIVING_WATER_KEYWORDS = (
+MAJOR_WATERBODY_KEYWORDS = (
     "river",
     "creek",
+    "lake",
     "bay",
     "branch",
-    "lake",
     "pond",
-    "gully",
+)
+
+OTHER_WATERBODY_KEYWORDS = (
+    "stream",
+    "tributary",
+    "slough",
     "lagoon",
     "swamp",
-    "stream",
+)
+
+SECONDARY_WATERBODY_KEYWORDS = (
     "ditch",
     "canal",
     "cove",
-    "slough",
     "harbor",
-    "tributary",
     "water",
+    "drainage",
+    "storm",
 )
+
+NEGATIVE_WATERBODY_PHRASES = (
+    "no specific",
+    "unknown",
+    "none",
+    "n/a",
+    "na",
+)
+
+RECEIVING_WATER_KEYWORDS = MAJOR_WATERBODY_KEYWORDS + OTHER_WATERBODY_KEYWORDS + SECONDARY_WATERBODY_KEYWORDS
 
 CONTAINED_LABEL = "Contained / did not reach state waters"
 CONTAINED_PHRASES = {
@@ -85,35 +102,6 @@ CONTAINED_PHRASES = {
     "did not reach waters",
     "no leak found",
     "unconfirmed",
-}
-
-# SSO Cause Classification Bins
-CAUSE_BINS = {
-    "Heavy Rain": [
-        "rain", "storm", "precipitation", "inflow", "infiltration", "i/i", 
-        "wet weather", "flood", "weather", "overflow due to rain"
-    ],
-    "Power Failure": [
-        "power outage", "electrical", "loss of power", "generator", "breaker", 
-        "utility power", "power failure"
-    ],
-    "Infrastructure Failure": [
-        "broken", "crack", "collapse", "blockage", "grease", "roots", "debris", 
-        "main break", "line break", "plugged", "obstruction", "pipe failure",
-        "valve", "seal failed", "gasket", "structural"
-    ],
-    "Lift Station Failure": [
-        "lift station", "pump station", "pump failure", "ls overflow", 
-        "scada failure", "float failure", "pump failed"
-    ],
-    "Treatment Plant Failure": [
-        "wwtp", "treatment plant", "clarifier", "aeration", "headworks", 
-        "plant failure", "plant overflow"
-    ],
-    "Development Damage": [
-        "line cut", "cut by", "contractor", "construction", "development", 
-        "excavation", "third party", "damaged by others"
-    ],
 }
 
 
@@ -146,34 +134,48 @@ def _normalize_receiving_water_name(raw_value: Optional[str]) -> Optional[str]:
     if not value:
         return None
 
+    # We split by semicolon to handle complex multi-destination strings
     parts = [part.strip() for part in value.split(";") if part and part.strip()]
-    if not parts:
-        parts = [value]
-
+    
+    major_candidates = []
+    other_candidates = []
+    secondary_candidates = []
+    
     for part in parts:
-        lower_part = part.lower()
-        if any(keyword in lower_part for keyword in RECEIVING_WATER_KEYWORDS):
-            return part
+        # Check for parenthetical names which are often the primary waterbody
+        # e.g., "Drainage Ditch(Coosa River)" -> "Coosa River"
+        paren_match = re.search(r'\(([^)]+)\)', part)
+        extracted_name = paren_match.group(1).strip() if paren_match else part
+        
+        # We consider both the extracted name and the full part
+        for name in [extracted_name, part]:
+            lower_name = name.lower()
+            
+            # Skip if it contains negative phrases
+            if any(neg in lower_name for neg in NEGATIVE_WATERBODY_PHRASES):
+                continue
+                
+            if any(kw in lower_name for kw in MAJOR_WATERBODY_KEYWORDS):
+                major_candidates.append(name)
+            elif any(kw in lower_name for kw in OTHER_WATERBODY_KEYWORDS):
+                other_candidates.append(name)
+            elif any(kw in lower_name for kw in SECONDARY_WATERBODY_KEYWORDS):
+                secondary_candidates.append(name)
+    
+    if major_candidates:
+        return major_candidates[0]
+    if other_candidates:
+        return other_candidates[0]
+    if secondary_candidates:
+        return secondary_candidates[0]
 
+    # Fallback to check for "contained" phrases if no specific waterbody found
     lower_value = value.lower()
     if any(phrase in lower_value for phrase in CONTAINED_PHRASES):
         return CONTAINED_LABEL
 
+    # Ultimate fallback: return the first part or the original value
     return parts[0] if parts else value
-
-
-def classify_sso_cause(cause: Optional[str]) -> str:
-    """Classify the SSO cause into a standard bin based on keywords."""
-    if not cause:
-        return "Unknown"
-    
-    cause_lower = cause.lower()
-    
-    for category, keywords in CAUSE_BINS.items():
-        if any(keyword in cause_lower for keyword in keywords):
-            return category
-            
-    return "Other"
 
 
 def _best_volume(record: SSORecord) -> Optional[float]:

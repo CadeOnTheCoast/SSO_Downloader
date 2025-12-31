@@ -22,7 +22,6 @@ from sso_schema import (
 )
 from sso_analytics import (
     _normalize_receiving_water_name,
-    classify_sso_cause,
 )
 from sso_volume import enrich_est_volume_fields, parse_est_volume
 
@@ -119,9 +118,8 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
         est_volume_is_range=est_volume_is_range_bool,
         est_volume_range_label=est_volume_range_label,
         cause=cause_val,
-        cause_category=classify_sso_cause(cause_val),
         receiving_water=_normalize_receiving_water_name(
-            raw_dict.get(RECEIVING_WATER_FIELD) or raw_dict.get("waterbody")
+            raw_dict.get(RECEIVING_WATER_FIELD) or raw_dict.get("waterbody") or raw_dict.get("rec_stream")
         ),
         x=_coerce_float(raw_dict.get("x")),
         y=_coerce_float(raw_dict.get("y")),

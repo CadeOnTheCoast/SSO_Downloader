@@ -143,7 +143,7 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                 </Pie>
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8E7', borderRadius: '8px' }}
-                                    itemStyle={{ color: TEXT_COLOR, fontWeights: 600 }}
+                                    itemStyle={{ color: TEXT_COLOR, fontWeight: 600 }}
                                     formatter={(value: any, name: any) => {
                                         const pct = totalVolume > 0 ? ((value / totalVolume) * 100).toFixed(1) : 0;
                                         return [`${(value ?? 0).toLocaleString()} gal (${pct}%)`, name || 'Unknown'];

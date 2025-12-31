@@ -123,19 +123,19 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col bg-slate-950 text-white">
-            <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-8 py-4 sticky top-0 z-10">
+        <div className="flex min-h-screen flex-col bg-white text-brand-charcoal">
+            <header className="border-b border-brand-sage/10 bg-white/80 backdrop-blur px-8 py-5 sticky top-0 z-10 shadow-sm">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
-                            <span className="font-bold text-white">S</span>
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-brand-teal flex items-center justify-center shadow-md">
+                            <span className="font-heading font-bold text-white text-xl">M</span>
                         </div>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                            SSO Downloader
+                        <h1 className="text-2xl font-heading font-bold text-brand-charcoal tracking-wider">
+                            MOBILE BAYKEEPER <span className="text-brand-teal">SSO</span>
                         </h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-400 border-r border-slate-700 pr-4">
+                        <span className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-widest border-r border-brand-sage/10 pr-6">
                             {userEmail}
                         </span>
                     </div>
@@ -144,16 +144,16 @@ export default function DashboardPage() {
 
             <main className="mx-auto w-full max-w-7xl p-8 space-y-8">
                 {/* Header Section */}
-                <div className="flex justify-between items-end">
+                <div className="flex justify-between items-center bg-brand-sage/5 p-8 rounded-lg border border-brand-sage/10">
                     <div>
-                        <h2 className="text-3xl font-bold text-white">Dashboard</h2>
-                        <p className="text-slate-400 mt-1">Real-time overview of sewage overflow events.</p>
+                        <h2 className="text-4xl font-heading font-bold text-brand-charcoal">Dashboard</h2>
+                        <p className="text-brand-charcoal/60 mt-2 font-medium">Real-time overview of sewage overflow events in Alabama.</p>
                     </div>
                     <button
                         onClick={handleDownload}
-                        className="bg-slate-800 hover:bg-slate-700 text-white text-sm px-4 py-2 rounded border border-slate-700 transition-colors"
+                        className="bg-brand-teal hover:bg-brand-charcoal text-white font-heading font-bold tracking-widest uppercase px-8 py-3 rounded-md shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0"
                     >
-                        Download CSV
+                        Export Data
                     </button>
                 </div>
 

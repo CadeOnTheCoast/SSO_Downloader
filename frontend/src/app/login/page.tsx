@@ -9,10 +9,13 @@ export default function LoginPage({
         <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
             <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                        SSO Downloader
+                    <div className="inline-flex h-12 w-12 rounded-full bg-brand-teal items-center justify-center shadow-md mb-4">
+                        <span className="font-heading font-bold text-white text-2xl">M</span>
+                    </div>
+                    <h1 className="text-4xl font-heading font-bold text-brand-charcoal tracking-tight">
+                        MOBILE BAYKEEPER <span className="text-brand-teal">SSO</span>
                     </h1>
-                    <p className="mt-2 text-slate-600">
+                    <p className="mt-4 text-brand-charcoal/60 font-medium">
                         Sign in with your email to access the dashboard.
                     </p>
                 </div>
@@ -21,7 +24,7 @@ export default function LoginPage({
                     <div>
                         <label
                             htmlFor="email"
-                            className="block text-sm font-semibold text-slate-700"
+                            className="block text-xs font-bold text-brand-charcoal/40 uppercase tracking-widest mb-2"
                         >
                             Email address
                         </label>
@@ -32,7 +35,7 @@ export default function LoginPage({
                             autoComplete="email"
                             required
                             placeholder="you@mobilebaykeeper.org"
-                            className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-3 text-slate-900 shadow-sm transition-focus focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+                            className="block w-full rounded-md border border-brand-sage/20 bg-brand-sage/5 px-4 py-3 text-brand-charcoal placeholder:text-brand-charcoal/20 shadow-sm transition-all focus:border-brand-teal focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-teal/10"
                         />
                     </div>
 
@@ -50,13 +53,13 @@ export default function LoginPage({
 
                     <button
                         formAction={login}
-                        className="flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-[0.98]"
+                        className="flex w-full items-center justify-center rounded-md bg-brand-teal px-4 py-3 text-sm font-heading font-bold tracking-widest uppercase text-white shadow-lg shadow-brand-teal/20 transition-all hover:bg-brand-charcoal hover:-translate-y-0.5 active:translate-y-0"
                     >
                         Send Magic Link
                     </button>
                 </form>
 
-                <p className="mt-8 text-center text-xs text-slate-500">
+                <p className="mt-8 text-center text-[10px] font-bold text-brand-charcoal/30 uppercase tracking-[0.2em]">
                     Restricted to @mobilebaykeeper.org and authorized domains.
                 </p>
             </div>

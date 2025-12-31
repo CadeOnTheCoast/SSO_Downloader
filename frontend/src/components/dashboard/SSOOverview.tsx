@@ -52,35 +52,35 @@ export function SSOOverview({ summary }: SSOOverviewProps) {
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-blue-500/30 transition-all">
-                    <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Activity className="h-6 w-6 text-blue-500" />
+                <div className="bg-white border border-brand-sage/20 rounded-lg p-8 flex flex-col items-center text-center shadow-sm group hover:border-brand-teal transition-all">
+                    <div className="h-12 w-12 rounded-full bg-brand-teal/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Activity className="h-6 w-6 text-brand-teal" />
                     </div>
-                    <div className="text-4xl font-bold text-white mb-2">{summary.total_count.toLocaleString()}</div>
-                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Raw sewage spills</div>
-                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500">
-                        Avg <span className="text-slate-300 font-semibold">{spillsPerDay}</span>/day since {formatDate(startDate)}
-                    </div>
-                </div>
-
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-emerald-500/30 transition-all">
-                    <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Droplets className="h-6 w-6 text-emerald-500" />
-                    </div>
-                    <div className="text-4xl font-bold text-white mb-2">{summary.total_volume.toLocaleString()}</div>
-                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Gallons of raw sewage</div>
-                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500">
-                        Avg <span className="text-slate-300 font-semibold">{gallonsPerHour}</span> gal/hour
+                    <div className="text-5xl font-heading font-bold text-brand-charcoal mb-2">{summary.total_count.toLocaleString()}</div>
+                    <div className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-[0.2em]">Raw sewage spills</div>
+                    <div className="mt-4 pt-4 border-t border-brand-sage/10 w-full text-xs text-brand-charcoal/60">
+                        Avg <span className="text-brand-charcoal font-bold">{spillsPerDay}</span>/day since {formatDate(startDate)}
                     </div>
                 </div>
 
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 flex flex-col items-center text-center group hover:border-amber-500/30 transition-all">
-                    <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <AlertTriangle className="h-6 w-6 text-amber-500" />
+                <div className="bg-white border border-brand-sage/20 rounded-lg p-8 flex flex-col items-center text-center shadow-sm group hover:border-brand-sage transition-all">
+                    <div className="h-12 w-12 rounded-full bg-brand-sage/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Droplets className="h-6 w-6 text-brand-sage" />
                     </div>
-                    <div className="text-4xl font-bold text-white mb-2 text-wrap px-4">{durationStr}</div>
-                    <div className="text-sm font-medium text-slate-400 uppercase tracking-wider">Total spill duration</div>
-                    <div className="mt-4 pt-4 border-t border-slate-800 w-full text-xs text-slate-500 italic">
+                    <div className="text-5xl font-heading font-bold text-brand-charcoal mb-2">{summary.total_volume.toLocaleString()}</div>
+                    <div className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-[0.2em]">Gallons of raw sewage</div>
+                    <div className="mt-4 pt-4 border-t border-brand-sage/10 w-full text-xs text-brand-charcoal/60">
+                        Avg <span className="text-brand-charcoal font-bold">{gallonsPerHour}</span> gal/hour
+                    </div>
+                </div>
+
+                <div className="bg-white border border-brand-sage/20 rounded-lg p-8 flex flex-col items-center text-center shadow-sm group hover:border-brand-mint transition-all">
+                    <div className="h-12 w-12 rounded-full bg-brand-mint/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <AlertTriangle className="h-6 w-6 text-brand-charcoal" />
+                    </div>
+                    <div className="text-3xl font-heading font-bold text-brand-charcoal mb-2 text-wrap px-4">{durationStr}</div>
+                    <div className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-[0.2em]">Total spill duration</div>
+                    <div className="mt-4 pt-4 border-t border-brand-sage/10 w-full text-xs text-brand-charcoal/40 italic">
                         Cumulative time spilling raw sewage
                     </div>
                 </div>
@@ -88,20 +88,20 @@ export function SSOOverview({ summary }: SSOOverviewProps) {
 
             {/* Fun Analogies Section */}
             {summary.volume_analogies && summary.volume_analogies.length > 0 && (
-                <div className="bg-gradient-to-br from-blue-900/10 to-transparent border border-blue-500/10 rounded-xl p-8">
-                    <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-[0.2em] mb-6 text-center">Volume Perspective</h3>
+                <div className="bg-brand-sage/5 border border-brand-sage/20 rounded-lg p-8">
+                    <h3 className="text-xs font-bold text-brand-charcoal uppercase tracking-[0.3em] mb-8 text-center">Volume Perspective</h3>
 
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                         {summary.volume_analogies.map((analogy, idx) => (
-                            <div key={idx} className="bg-slate-950/40 border border-slate-800 rounded-lg p-5 relative overflow-hidden group hover:border-blue-500/20 transition-all">
-                                <div className="absolute -top-1 -right-1 text-3xl opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                            <div key={idx} className="bg-white border border-brand-sage/10 rounded-lg p-6 relative overflow-hidden group hover:border-brand-teal/30 transition-all shadow-sm">
+                                <div className="absolute -top-2 -right-2 text-4xl opacity-[0.05] group-hover:opacity-[0.1] transition-opacity">
                                     {analogy.emoji}
                                 </div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <div className="text-[10px] font-bold text-brand-charcoal/40 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <span>{analogy.emoji}</span> {analogy.label}
                                 </div>
-                                <div className="text-xl font-bold text-white mb-1">{analogy.value}</div>
-                                <div className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                                <div className="text-2xl font-heading font-bold text-brand-charcoal mb-2">{analogy.value}</div>
+                                <div className="text-xs text-brand-charcoal/70 line-clamp-2 italic leading-relaxed">
                                     {analogy.text}
                                 </div>
                             </div>

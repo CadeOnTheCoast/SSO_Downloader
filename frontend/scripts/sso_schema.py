@@ -14,10 +14,11 @@ START_DATE_FIELD = "date_sso_began"
 END_DATE_FIELD = "date_sso_stopped"
 VOLUME_GALLONS_FIELD = "volume_gallons"
 SSO_ID_FIELD = "sso_id"
-RECEIVING_WATER_FIELD = "receiving_water"
 CAUSE_FIELD = "cause"
+CAUSE_CATEGORY_FIELD = "cause_category"
 SEWER_SYSTEM_FIELD = "sewer_system"
 LOCATION_FIELD = "location"
+RECEIVING_WATER_FIELD = "receiving_water"
 
 
 CENTRAL_TZ = ZoneInfo("America/Chicago")
@@ -43,6 +44,7 @@ class SSORecord:
     est_volume_is_range: Optional[bool] = None
     est_volume_range_label: Optional[str] = None
     cause: Optional[str] = None
+    cause_category: Optional[str] = None
     receiving_water: Optional[str] = None
 
     x: Optional[float] = None

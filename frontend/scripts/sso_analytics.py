@@ -1,6 +1,8 @@
 """Analytics and QA helpers for SSO records."""
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from datetime import datetime
 from statistics import mean, median
@@ -69,6 +71,8 @@ RECEIVING_WATER_KEYWORDS = (
     "cove",
     "slough",
     "harbor",
+    "tributary",
+    "water",
 )
 
 CONTAINED_LABEL = "Contained / did not reach state waters"
@@ -79,6 +83,37 @@ CONTAINED_PHRASES = {
     "contained",
     "did not reach us waters",
     "did not reach waters",
+    "no leak found",
+    "unconfirmed",
+}
+
+# SSO Cause Classification Bins
+CAUSE_BINS = {
+    "Heavy Rain": [
+        "rain", "storm", "precipitation", "inflow", "infiltration", "i/i", 
+        "wet weather", "flood", "weather", "overflow due to rain"
+    ],
+    "Power Failure": [
+        "power outage", "electrical", "loss of power", "generator", "breaker", 
+        "utility power", "power failure"
+    ],
+    "Infrastructure Failure": [
+        "broken", "crack", "collapse", "blockage", "grease", "roots", "debris", 
+        "main break", "line break", "plugged", "obstruction", "pipe failure",
+        "valve", "seal failed", "gasket", "structural"
+    ],
+    "Lift Station Failure": [
+        "lift station", "pump station", "pump failure", "ls overflow", 
+        "scada failure", "float failure", "pump failed"
+    ],
+    "Treatment Plant Failure": [
+        "wwtp", "treatment plant", "clarifier", "aeration", "headworks", 
+        "plant failure", "plant overflow"
+    ],
+    "Development Damage": [
+        "line cut", "cut by", "contractor", "construction", "development", 
+        "excavation", "third party", "damaged by others"
+    ],
 }
 
 
@@ -103,6 +138,11 @@ def _normalize_receiving_water_name(raw_value: Optional[str]) -> Optional[str]:
     if not raw_value:
         return None
     value = str(raw_value).strip()
+    if not value or value.lower() in ("none", "n/a", "na", "unknown"):
+        return None
+
+    # Handle common PDF filler text that might be captured
+    value = re.sub(r'^(Provide the first named creek or river that receives the flow\.|Note:|Did the discharge).*$', '', value, flags=re.IGNORECASE).strip()
     if not value:
         return None
 
@@ -120,6 +160,20 @@ def _normalize_receiving_water_name(raw_value: Optional[str]) -> Optional[str]:
         return CONTAINED_LABEL
 
     return parts[0] if parts else value
+
+
+def classify_sso_cause(cause: Optional[str]) -> str:
+    """Classify the SSO cause into a standard bin based on keywords."""
+    if not cause:
+        return "Unknown"
+    
+    cause_lower = cause.lower()
+    
+    for category, keywords in CAUSE_BINS.items():
+        if any(keyword in cause_lower for keyword in keywords):
+            return category
+            
+    return "Other"
 
 
 def _best_volume(record: SSORecord) -> Optional[float]:
@@ -418,7 +472,7 @@ def build_time_series(records: Sequence[SSORecord]) -> Dict[str, Any]:
     span_days = (max_date.date() - min_date.date()).days
     
     # Automatic granularity
-    if span_days > 730: # 2+ years
+    if span_days > 365: # 1+ year
         granularity = "year"
     elif span_days > 90: # 3+ months
         granularity = "month"
@@ -433,15 +487,19 @@ def build_time_series(records: Sequence[SSORecord]) -> Dict[str, Any]:
         
         if granularity == "year":
             key = str(dt.year)
+            label = str(dt.year)
         elif granularity == "month":
             key = f"{dt.year:04d}-{dt.month:02d}"
+            label = f"{dt.year}-{dt.month:02d}"
         else:
             key = dt.strftime("%Y-%m-%d")
+            label = key
 
         bucket = buckets.setdefault(
             key,
             {
                 "date": key,
+                "period_label": label,
                 "count": 0,
                 "volume": 0.0,
             },
@@ -581,6 +639,18 @@ def build_dashboard_summary(
     by_receiving_water = summarize_by_receiving_water(records, top_n=10)
 
     payload: Dict[str, Any] = {
+        "summary_counts": {
+            "total_records": len(records),
+            "total_count": len(records),
+            "total_volume": total_volume,
+            "total_volume_gallons": total_volume,
+            "avg_volume": avg_volume,
+            "max_volume": max_volume,
+            "total_duration_hours": float(sum(duration_hours)) if duration_hours else 0.0,
+            "distinct_utilities": len(utilities),
+            "distinct_receiving_waters": len(receiving_waters),
+            "date_range": {"min": date_min, "max": date_max},
+        },
         "total_count": len(records),
         "total_volume": total_volume,
         "avg_volume": avg_volume,

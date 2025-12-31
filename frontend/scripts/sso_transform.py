@@ -20,6 +20,10 @@ from sso_schema import (
     RECEIVING_WATER_FIELD,
     format_datetime_central,
 )
+from sso_analytics import (
+    _normalize_receiving_water_name,
+    classify_sso_cause,
+)
 from sso_volume import enrich_est_volume_fields, parse_est_volume
 
 
@@ -98,6 +102,8 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
     if volume_value is None and est_volume_gal is not None:
         volume_value = _coerce_float(est_volume_gal)
 
+    cause_val = _coerce_str(raw_dict.get(CAUSE_FIELD))
+
     return SSORecord(
         sso_id=_coerce_str(raw_dict.get(SSO_ID_FIELD)),
         utility_id=_coerce_str(raw_dict.get(UTILITY_ID_FIELD)),
@@ -112,8 +118,9 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
         est_volume_gal=est_volume_gal,
         est_volume_is_range=est_volume_is_range_bool,
         est_volume_range_label=est_volume_range_label,
-        cause=_coerce_str(raw_dict.get(CAUSE_FIELD)),
-        receiving_water=_coerce_str(
+        cause=cause_val,
+        cause_category=classify_sso_cause(cause_val),
+        receiving_water=_normalize_receiving_water_name(
             raw_dict.get(RECEIVING_WATER_FIELD) or raw_dict.get("waterbody")
         ),
         x=_coerce_float(raw_dict.get("x")),

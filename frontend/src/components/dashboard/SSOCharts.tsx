@@ -188,10 +188,9 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                         cursor={{ fill: '#F8F9FB' }}
                                         contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8E7', borderRadius: '8px' }}
                                         itemStyle={{ color: TEXT_COLOR, fontWeight: 600 }}
-                                        itemStyle={{ color: BRAND_CHARCOAL, fontWeight: 600 }}
                                         formatter={(value: any) => `${(value ?? 0).toLocaleString()} gal`}
                                     />
-                                    <Bar dataKey="total_volume" fill={BRAND_LIGHT_SAGE} radius={[0, 4, 4, 0]} />
+                                    <Bar dataKey="total_volume" fill="#8CCAAE" radius={[0, 4, 4, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (

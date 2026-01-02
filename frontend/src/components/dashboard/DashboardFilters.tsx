@@ -92,14 +92,32 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     }
 
     // Enhanced utility filtering (Name, Slug, ID, Aliases)
-    const filteredUtilities = options?.utilities.filter(u => {
+    const filteredUtilities = (options?.utilities.filter(u => {
         const query = utilitySearch.toLowerCase()
         if (!query) return true
         return u.name.toLowerCase().includes(query) ||
             u.slug.toLowerCase().includes(query) ||
             u.id.toLowerCase().includes(query) ||
             (u.aliases || []).some(a => a.toLowerCase().includes(query))
-    }).slice(0, 50) || []
+    }) || []).sort((a, b) => {
+        const query = utilitySearch.toLowerCase()
+        if (!query) return 0
+        const aName = a.name.toLowerCase()
+        const bName = b.name.toLowerCase()
+        // Exact match params
+        const aExact = aName === query || a.id.toLowerCase() === query || a.slug.toLowerCase() === query
+        const bExact = bName === query || b.id.toLowerCase() === query || b.slug.toLowerCase() === query
+        if (aExact && !bExact) return -1
+        if (!aExact && bExact) return 1
+
+        // Starts with params
+        const aStarts = aName.startsWith(query)
+        const bStarts = bName.startsWith(query)
+        if (aStarts && !bStarts) return -1
+        if (!aStarts && bStarts) return 1
+
+        return 0
+    }).slice(0, 50)
 
     // Suggestion logic for "Did you mean"
     const getSuggestion = () => {
@@ -117,7 +135,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     // Permit ID filtering
     const filteredPermits = options?.utilities.filter(u => {
-        const query = (filters.permit || permitSearch).toLowerCase()
+        const query = permitSearch.toLowerCase()
         if (!query) return false
         return u.id.toLowerCase().includes(query) ||
             u.slug.toLowerCase().includes(query) ||
@@ -292,9 +310,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                 <div className="space-y-2" ref={permitRef}>
                     <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID / Outfall</label>
                     <div className="relative group">
-                        {/* Radio buttons for single utility with multiple permits */}
-                        {selectedUtilityIds.length === 1 && (selectedUtilities[0]?.permits || []).length > 0 ? (
-                            <div className="bg-slate-50 border border-brand-sage/20 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                        {/* Radio buttons for selected utilities (single or multi) */}
+                        {selectedUtilities.length > 0 && selectedUtilities.some(u => (u.permits || []).length > 0) ? (
+                            <div className="bg-slate-50 border border-brand-sage/20 rounded-lg p-3 space-y-3 max-h-60 overflow-y-auto">
                                 <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded">
                                     <input
                                         type="radio"
@@ -304,20 +322,32 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                         onChange={() => setFilters(prev => ({ ...prev, permit: undefined }))}
                                         className="text-brand-teal focus:ring-brand-teal"
                                     />
-                                    <span className={!filters.permit ? 'font-bold text-brand-teal' : 'text-brand-charcoal'}>All Permits</span>
+                                    <span className={!filters.permit ? 'font-bold text-brand-teal' : 'text-brand-charcoal'}>All Selected Permits</span>
                                 </label>
-                                {selectedUtilities[0].permits.map(pid => (
-                                    <label key={pid} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded">
-                                        <input
-                                            type="radio"
-                                            name="permit_select"
-                                            value={pid}
-                                            checked={filters.permit === pid}
-                                            onChange={() => setFilters(prev => ({ ...prev, permit: pid }))}
-                                            className="text-brand-teal focus:ring-brand-teal"
-                                        />
-                                        <span className="font-mono text-xs">{pid}</span>
-                                    </label>
+
+                                {selectedUtilities.map(util => (
+                                    (util.permits || []).length > 0 && (
+                                        <div key={util.id} className="space-y-1">
+                                            {selectedUtilities.length > 1 && (
+                                                <div className="text-[10px] uppercase font-bold text-brand-sage/60 ml-1 mt-2 mb-1">
+                                                    {util.name}
+                                                </div>
+                                            )}
+                                            {util.permits.map(pid => (
+                                                <label key={pid} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded ml-1">
+                                                    <input
+                                                        type="radio"
+                                                        name="permit_select"
+                                                        value={pid}
+                                                        checked={filters.permit === pid}
+                                                        onChange={() => setFilters(prev => ({ ...prev, permit: pid }))}
+                                                        className="text-brand-teal focus:ring-brand-teal"
+                                                    />
+                                                    <span className="font-mono text-xs">{pid}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )
                                 ))}
                             </div>
                         ) : (
@@ -332,7 +362,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                     onChange={(e) => {
                                         setPermitSearch(e.target.value)
                                         setShowPermitDropdown(true)
-                                        setFilters(prev => ({ ...prev, permit: e.target.value || undefined, utility_id: undefined }))
+                                        // Removed setFilters on keystroke to prevent lag/wonkiness
                                     }}
                                 />
                                 {showPermitDropdown && permitSearch.length > 0 && (
@@ -343,8 +373,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                     key={u.id}
                                                     type="button"
                                                     onClick={() => {
-                                                        // For permit search, we might set utility context if it matches perfectly
-                                                        setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined }))
+                                                        setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined, utility_ids: undefined }))
                                                         setPermitSearch('')
                                                         setShowPermitDropdown(false)
                                                     }}

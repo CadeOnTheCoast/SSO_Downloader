@@ -22,10 +22,13 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     })
     const [loadingOptions, setLoadingOptions] = useState(true)
     const [utilitySearch, setUtilitySearch] = useState('')
+    const [permitSearch, setPermitSearch] = useState('')
     const [countySearch, setCountySearch] = useState('')
     const [showUtilityDropdown, setShowUtilityDropdown] = useState(false)
+    const [showPermitDropdown, setShowPermitDropdown] = useState(false)
     const [showCountyDropdown, setShowCountyDropdown] = useState(false)
     const utilityRef = useRef<HTMLDivElement>(null)
+    const permitRef = useRef<HTMLDivElement>(null)
     const countyRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -39,6 +42,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
             if (utilityRef.current && !utilityRef.current.contains(event.target as Node)) {
                 setShowUtilityDropdown(false)
             }
+            if (permitRef.current && !permitRef.current.contains(event.target as Node)) {
+                setShowPermitDropdown(false)
+            }
             if (countyRef.current && !countyRef.current.contains(event.target as Node)) {
                 setShowCountyDropdown(false)
             }
@@ -46,6 +52,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 setShowUtilityDropdown(false)
+                setShowPermitDropdown(false)
                 setShowCountyDropdown(false)
             }
         }
@@ -71,6 +78,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
         setFilters(resetFilters)
         setUtilitySearch('')
+        setPermitSearch('')
         setCountySearch('')
         onFilterChange(resetFilters)
     }
@@ -80,10 +88,36 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         onFilterChange(filters)
     }
 
-    const filteredUtilities = options?.utilities.filter(u =>
-        u.name.toLowerCase().includes(utilitySearch.toLowerCase()) ||
-        u.id.toLowerCase().includes(utilitySearch.toLowerCase())
-    ).slice(0, 50) || []
+    // Enhanced utility filtering (Name, Slug, ID)
+    const filteredUtilities = options?.utilities.filter(u => {
+        const query = utilitySearch.toLowerCase()
+        return u.name.toLowerCase().includes(query) ||
+            u.slug.toLowerCase().includes(query) ||
+            u.id.toLowerCase().includes(query)
+    }).slice(0, 50) || []
+
+    // Suggestion logic for "Did you mean"
+    const getSuggestion = () => {
+        if (utilitySearch.length < 3 || filteredUtilities.length > 0 || !options) return null
+        const query = utilitySearch.toLowerCase()
+        // Simple heuristic: find utility that starts with the query, or closest match
+        const suggestion = options.utilities.find(u =>
+            u.name.toLowerCase().startsWith(query.slice(0, 3)) ||
+            u.slug.toLowerCase().startsWith(query.slice(0, 3))
+        )
+        return suggestion
+    }
+
+    const suggestion = getSuggestion()
+
+    // Permit ID filtering
+    const filteredPermits = options?.utilities.filter(u => {
+        const query = (filters.permit || permitSearch).toLowerCase()
+        if (!query) return false
+        return u.id.toLowerCase().includes(query) ||
+            u.slug.toLowerCase().includes(query) ||
+            u.name.toLowerCase().includes(query)
+    }).slice(0, 20) || []
 
     const filteredCounties = options?.counties.filter(c =>
         c.toLowerCase().includes(countySearch.toLowerCase())
@@ -142,8 +176,67 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                             }}
                                             className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
                                         >
-                                            <div className="font-bold text-brand-charcoal">{u.name}</div>
+                                            <div className="flex justify-between items-start">
+                                                <div className="font-bold text-brand-charcoal">{u.name}</div>
+                                                <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{u.slug}</div>
+                                            </div>
                                             <div className="text-xs text-brand-sage">{u.id}</div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="px-4 py-4 text-sm text-brand-sage italic">
+                                        No matches found.
+                                        {suggestion && (
+                                            <div className="mt-2 not-italic">
+                                                Did you mean <button
+                                                    type="button"
+                                                    onClick={() => setUtilitySearch(suggestion.name)}
+                                                    className="text-brand-teal hover:underline font-bold"
+                                                >
+                                                    {suggestion.name}
+                                                </button>?
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Enhanced Permit ID Searchable Selection */}
+                <div className="space-y-2" ref={permitRef}>
+                    <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID (Selection)</label>
+                    <div className="relative group">
+                        <input
+                            type="text"
+                            className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg px-3 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all uppercase placeholder:text-brand-sage/30"
+                            placeholder={filters.permit || "Search by permit/slug..."}
+                            value={permitSearch}
+                            onFocus={() => setShowPermitDropdown(true)}
+                            onChange={(e) => {
+                                setPermitSearch(e.target.value)
+                                setShowPermitDropdown(true)
+                                setFilters(prev => ({ ...prev, permit: e.target.value || undefined, utility_id: undefined }))
+                            }}
+                        />
+                        {showPermitDropdown && permitSearch.length > 0 && (
+                            <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
+                                {filteredPermits.length > 0 ? (
+                                    filteredPermits.map(u => (
+                                        <button
+                                            key={u.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined }))
+                                                setPermitSearch('')
+                                                setShowPermitDropdown(false)
+                                            }}
+                                            className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
+                                        >
+                                            <div className="font-mono text-xs font-bold text-brand-teal">{u.id}</div>
+                                            <div className="text-[10px] text-brand-sage truncate">{u.name}</div>
+                                            <div className="text-[9px] text-brand-sage/60 font-mono italic">{u.slug}</div>
                                         </button>
                                     ))
                                 ) : (
@@ -152,21 +245,6 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                             </div>
                         )}
                     </div>
-                </div>
-
-                {/* Optional Permit ID Input */}
-                <div className="space-y-2">
-                    <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID (Optional)</label>
-                    <input
-                        type="text"
-                        className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg px-3 py-2 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all uppercase placeholder:text-brand-sage/30"
-                        placeholder="AL0000000"
-                        value={filters.permit || ''}
-                        onChange={(e) => {
-                            const val = e.target.value || undefined
-                            setFilters(prev => ({ ...prev, permit: val, utility_id: undefined }))
-                        }}
-                    />
                 </div>
 
                 {/* County Selection */}

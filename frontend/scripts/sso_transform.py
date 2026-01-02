@@ -26,6 +26,78 @@ from sso_analytics import (
 from sso_volume import enrich_est_volume_fields, parse_est_volume
 
 
+# Mapping for canonicalizing permittee names and consolidating duplicates
+PERMITTEE_MAP = {
+    # Baldwin County Consolidation (ALSI9902013, AL0049859)
+    "ALSI9902013": "Baldwin County Sewer Service",
+    "AL0049859": "Baldwin County Sewer Service",
+    "south alabama utilities services, inc.": "Baldwin County Sewer Service",
+    "south alabama utility service, inc wwtp": "Baldwin County Sewer Service",
+    "baldwin county sewer services": "Baldwin County Sewer Service",
+    "baldwin county sewer service, llc": "Baldwin County Sewer Service",
+    
+    # Anniston Consolidation
+    "the water works & sewer board of the city of anniston": "Utilities of Anniston",
+    "the water works and sewer board of the city of anniston": "Utilities of Anniston",
+    
+    # Gadsden Consolidation
+    "the water works & sewer board of the city of gadsden": "Utilities of Gadsden",
+}
+
+import re
+
+def simplify_permittee_name(name: str) -> str:
+    """Simplify permittee names to 'Utilities of [Name]' format."""
+    if not name:
+        return name
+        
+    # Order patterns from most specific to least specific
+    patterns = [
+        r"^The Utilities Board of the City [Oo]f\s+",
+        r"^The Utilities Board of the Town [Oo]f\s+",
+        r"^The Water Works (?:and|&) Sewer Board of the City [Oo]f\s+",
+        r"^The Water Works and Sanitary Sewer Board [Oo]f\s+",
+        r"^Utilities Board [Oo]f the City [Oo]f\s+",
+        r"^Water Works (?:and|&) Sewer Board [Oo]f the City [Oo]f\s+",
+        r"^Utilities Board [Oo]f the Town [Oo]f\s+",
+        r"^Utilities Board [Oo]f\s+",
+        r"^Water Works (?:and|&) Sewer Board [Oo]f\s+",
+        r"^[Cc]ity [Oo]f\s+",
+        r"^[Tt]own [Oo]f\s+",
+        r"^[Vv]illage [Oo]f\s+",
+        r"^[Tt]he Utilities Board [Oo]f\s+",
+    ]
+    
+    cleaned = name.strip()
+    # Strip ", AL" or similar State suffixes
+    cleaned = re.sub(r",\s*[A-Z]{2}$", "", cleaned)
+    
+    # Specific simplification for MAWSS
+    if "Mobile Area Water and Sewer System" in cleaned:
+        return "MAWSS"
+        
+    for pattern in patterns:
+        if re.search(pattern, cleaned, re.IGNORECASE):
+            entity_name = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip()
+            # If the resulting name is just "the City", cleanup again
+            entity_name = re.sub(r"^[Tt]he\s+", "", entity_name)
+            
+            if not entity_name.lower().endswith("utilities"):
+                return f"Utilities of {entity_name}"
+            return entity_name
+
+    return cleaned
+
+
+def generate_slug(name: str) -> str:
+    """Generate a URL-safe slug from a permittee name."""
+    if not name:
+        return ""
+    text = name.lower()
+    text = re.sub(r'[^a-z0-9]+', '-', text)
+    return text.strip('-')
+
+
 def _coerce_str(value: Any) -> Optional[str]:
     if value is None:
         return None
@@ -103,10 +175,22 @@ def normalize_sso_record(raw: Mapping[str, Any]) -> SSORecord:
 
     cause_val = _coerce_str(raw_dict.get(CAUSE_FIELD))
 
+    utility_id = _coerce_str(raw_dict.get(UTILITY_ID_FIELD))
+    utility_name = _coerce_str(raw_dict.get(UTILITY_NAME_FIELD) or raw_dict.get("utility_name"))
+
+    # Apply canonical mapping for consistent permittee names
+    if utility_id and utility_id in PERMITTEE_MAP:
+        utility_name = PERMITTEE_MAP[utility_id]
+    elif utility_name and utility_name.lower() in PERMITTEE_MAP:
+        utility_name = PERMITTEE_MAP[utility_name.lower()]
+    
+    # Simplify naming (e.g. City of X -> Utilities of X)
+    utility_name = simplify_permittee_name(utility_name)
+
     return SSORecord(
         sso_id=_coerce_str(raw_dict.get(SSO_ID_FIELD)),
-        utility_id=_coerce_str(raw_dict.get(UTILITY_ID_FIELD)),
-        utility_name=_coerce_str(raw_dict.get(UTILITY_NAME_FIELD) or raw_dict.get("utility_name")),
+        utility_id=utility_id,
+        utility_name=utility_name,
         sewer_system=_coerce_str(raw_dict.get(SEWER_SYSTEM_FIELD)),
         county=_coerce_str(raw_dict.get(COUNTY_FIELD)),
         location_desc=_coerce_str(raw_dict.get("location_desc") or raw_dict.get(LOCATION_FIELD)),

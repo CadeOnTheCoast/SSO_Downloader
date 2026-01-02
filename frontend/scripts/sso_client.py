@@ -17,6 +17,7 @@ from sso_schema import (
     UTILITY_NAME_FIELD,
     SSOQuery,
 )
+from sso_transform import PERMITTEE_MAP, simplify_permittee_name, generate_slug
 
 DEFAULT_BASE_URL = "https://gis.adem.alabama.gov/arcgis/rest/services/SSOs_ALL_OB_ID/MapServer/0/query"
 DEFAULT_PAGE_SIZE = 2000
@@ -124,7 +125,13 @@ class SSOClient:
                 f"Request failed with status {response.status_code}: {response.text[:200]}"
             )
         try:
-            return response.json()
+            data = response.json()
+            if "error" in data:
+                err = data["error"]
+                raise SSOClientError(
+                    f"ArcGIS Error {err.get('code')}: {err.get('message')} - {err.get('details')}"
+                )
+            return data
         except ValueError as exc:  # pragma: no cover - defensive
             raise SSOClientError("Failed to decode JSON response") from exc
 
@@ -272,9 +279,9 @@ class SSOClient:
         params: Dict[str, Any] = {
             "where": "1=1",
             "outFields": ",".join(fields),
-            "returnDistinctValues": True,
+            "returnDistinctValues": "true",
+            "returnGeometry": "false",
             "f": "json",
-            "resultRecordCount": 2000,
         }
         if order_by:
             params["orderByFields"] = order_by
@@ -316,6 +323,16 @@ class SSOClient:
         for attrs in raw:
             name = str(attrs.get(UTILITY_NAME_FIELD) or "").strip()
             permit = str(attrs.get(UTILITY_ID_FIELD) or "").strip()
+
+            # Apply canonical mapping for consistent permittee names
+            if permit and permit in PERMITTEE_MAP:
+                name = PERMITTEE_MAP[permit]
+            elif name and name.lower() in PERMITTEE_MAP:
+                name = PERMITTEE_MAP[name.lower()]
+
+            # Simplify naming (e.g. City of X -> Utilities of X)
+            name = simplify_permittee_name(name)
+
             if not name and not permit:
                 continue
             key = (name or permit).lower()
@@ -343,7 +360,12 @@ class SSOClient:
                 continue
             primary = permits[0]
             name = str(entry.get("label") or key_lower).strip() or key_lower.title()
-            rows.append({"id": primary, "name": name, "permits": permits})
+            rows.append({
+                "id": primary,
+                "name": name,
+                "slug": generate_slug(name),
+                "permits": permits
+            })
 
         rows.sort(key=lambda item: item["name"].lower())
         return rows

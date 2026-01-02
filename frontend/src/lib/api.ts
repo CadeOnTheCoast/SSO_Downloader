@@ -49,7 +49,13 @@ export interface SSORecord {
 }
 
 export interface FilterOptions {
-    utilities: { id: string; name: string; slug: string }[]
+    utilities: {
+        id: string;
+        name: string;
+        slug: string;
+        permits: string[];
+        aliases: string[];
+    }[]
     counties: string[]
 }
 

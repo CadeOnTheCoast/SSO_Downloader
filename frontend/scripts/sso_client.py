@@ -336,16 +336,23 @@ class SSOClient:
             if not name and not permit:
                 continue
             key = (name or permit).lower()
-            entry = mapping.setdefault(key, {"label": name or permit or key, "permits": set()})
+            entry = mapping.setdefault(key, {"label": name or permit or key, "permits": set(), "aliases": set()})
             if name:
                 entry["label"] = name
-            entry["permits"].add(permit or name)
+            if permit:
+                entry["permits"].add(permit)
+            
+            # Store the original raw name as an alias for search matching
+            raw_name = str(attrs.get(UTILITY_NAME_FIELD) or "").strip()
+            if raw_name:
+                entry["aliases"].add(raw_name)
 
         normalized: dict[str, dict[str, object]] = {}
         for key, entry in mapping.items():
             normalized[key] = {
                 "label": entry["label"],
                 "permits": sorted(entry["permits"]),
+                "aliases": sorted(entry["aliases"]),
             }
         return normalized
 
@@ -364,7 +371,8 @@ class SSOClient:
                 "id": primary,
                 "name": name,
                 "slug": generate_slug(name),
-                "permits": permits
+                "permits": permits,
+                "aliases": list(entry.get("aliases") or [])
             })
 
         rows.sort(key=lambda item: item["name"].lower())

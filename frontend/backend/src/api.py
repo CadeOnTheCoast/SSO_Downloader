@@ -183,6 +183,7 @@ def _load_options(client: SSOClient) -> dict[str, object]:
                     "name": item.get("name"),
                     "slug": item.get("slug"),
                     "permits": item.get("permits", []),
+                    "aliases": item.get("aliases", []),
                 }
                 for item in fresh_permittees
             ]

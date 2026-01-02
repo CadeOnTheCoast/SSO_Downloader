@@ -169,7 +169,6 @@ class SSOClient:
     ) -> list[dict]:
         params: Dict[str, Any] = {
             "outFields": "*",
-            "outSR": "4326",
             "f": "json",
         }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import sys
+import math
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -464,6 +465,19 @@ def _fetch_normalized_records(
     return sliced, len(normalized), safe_limit
 
 
+def project_web_mercator_to_latlon(x, y):
+    if x is None or y is None:
+        return None, None
+    # Check if already lat/long (simple heuristic)
+    if abs(x) <= 180 and abs(y) <= 90:
+        return x, y
+        
+    lon = (x / 20037508.34) * 180
+    lat = (y / 20037508.34) * 180
+    lat = 180 / math.pi * (2 * math.atan(math.exp(lat * math.pi / 180)) - math.pi / 2)
+    return lon, lat
+
+
 def _serialize_record(record) -> dict[str, object]:
     return {
         "id": record.sso_id,
@@ -480,8 +494,8 @@ def _serialize_record(record) -> dict[str, object]:
         "cause": record.cause,
         "receiving_water": record.receiving_water,
         "address": record.location_desc,
-        "latitude": record.y,
-        "longitude": record.x,
+        "latitude": project_web_mercator_to_latlon(record.x, record.y)[1],
+        "longitude": project_web_mercator_to_latlon(record.x, record.y)[0],
     }
 
 

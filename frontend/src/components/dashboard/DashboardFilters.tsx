@@ -95,7 +95,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         return u.name.toLowerCase().includes(query) ||
             u.slug.toLowerCase().includes(query) ||
             u.id.toLowerCase().includes(query) ||
-            u.aliases?.some(a => a.toLowerCase().includes(query))
+            (u.aliases || []).some(a => a.toLowerCase().includes(query))
     }).slice(0, 50) || []
 
     // Suggestion logic for "Did you mean"
@@ -196,32 +196,32 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
                                                         <div className="font-bold text-brand-charcoal">{highlightMatch(u.name, utilitySearch)}</div>
-                                                        {u.permits.length > 1 && (
+                                                        {(u.permits || []).length > 1 && (
                                                             <span className="px-1.5 py-0.5 bg-brand-teal/10 text-brand-teal text-[9px] font-bold rounded uppercase tracking-tighter">
                                                                 {u.permits.length} Permits
                                                             </span>
                                                         )}
                                                     </div>
                                                     {/* Show matched alias if different from canonical name */}
-                                                    {utilitySearch.length > 1 && u.aliases?.find(a =>
+                                                    {utilitySearch.length > 1 && (u.aliases || []).find(a =>
                                                         a.toLowerCase().includes(utilitySearch.toLowerCase()) &&
                                                         a.toLowerCase() !== u.name.toLowerCase()
                                                     ) && (
                                                             <div className="text-[10px] text-brand-sage italic mt-0.5">
-                                                                alias: "{highlightMatch(u.aliases.find(a => a.toLowerCase().includes(utilitySearch.toLowerCase()))!, utilitySearch)}"
+                                                                alias: "{highlightMatch((u.aliases || []).find(a => a.toLowerCase().includes(utilitySearch.toLowerCase()))!, utilitySearch)}"
                                                             </div>
                                                         )}
                                                 </div>
                                                 <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{highlightMatch(u.slug, utilitySearch)}</div>
                                             </div>
                                             <div className="mt-1 flex flex-wrap gap-1">
-                                                {u.permits.slice(0, 3).map(p => (
+                                                {(u.permits || []).slice(0, 3).map(p => (
                                                     <span key={p} className="text-[10px] text-brand-sage font-mono bg-slate-100 px-1 rounded">
                                                         {highlightMatch(p, utilitySearch)}
                                                     </span>
                                                 ))}
-                                                {u.permits.length > 3 && (
-                                                    <span className="text-[9px] text-brand-sage/60 font-medium">+{u.permits.length - 3} more</span>
+                                                {(u.permits || []).length > 3 && (
+                                                    <span className="text-[9px] text-brand-sage/60 font-medium">+{(u.permits || []).length - 3} more</span>
                                                 )}
                                             </div>
                                         </button>

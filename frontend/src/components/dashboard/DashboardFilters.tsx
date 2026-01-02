@@ -175,6 +175,21 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         setUtilitySearch('')
     }
 
+    const togglePermit = (id: string) => {
+        const current = new Set(filters.permits || [])
+        if (current.has(id)) {
+            current.delete(id)
+        } else {
+            current.add(id)
+        }
+        const nextIds = Array.from(current)
+        setFilters(prev => ({
+            ...prev,
+            permits: nextIds.length > 0 ? nextIds : undefined,
+            permit: undefined // Clear legacy single permit
+        }))
+    }
+
     const highlightMatch = (text: string, query: string) => {
         if (!query) return text
         const parts = text.split(new RegExp(`(${query})`, 'gi'))
@@ -318,19 +333,17 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                 <div className="space-y-2" ref={permitRef}>
                     <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID / Outfall</label>
                     <div className="relative group">
-                        {/* Radio buttons for selected utilities (single or multi) */}
+                        {/* Multi-select checkboxes for selected utilities */}
                         {selectedUtilities.length > 0 && selectedUtilities.some(u => (u.permits || []).length > 0) ? (
                             <div className="bg-slate-50 border border-brand-sage/20 rounded-lg p-3 space-y-3 max-h-60 overflow-y-auto">
                                 <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded">
                                     <input
-                                        type="radio"
-                                        name="permit_select"
-                                        value=""
-                                        checked={!filters.permit}
-                                        onChange={() => setFilters(prev => ({ ...prev, permit: undefined }))}
-                                        className="text-brand-teal focus:ring-brand-teal"
+                                        type="checkbox"
+                                        checked={!filters.permits || filters.permits.length === 0}
+                                        onChange={() => setFilters(prev => ({ ...prev, permits: undefined, permit: undefined }))}
+                                        className="text-brand-teal focus:ring-brand-teal rounded"
                                     />
-                                    <span className={!filters.permit ? 'font-bold text-brand-teal' : 'text-brand-charcoal'}>All Selected Permits</span>
+                                    <span className={(!filters.permits || filters.permits.length === 0) ? 'font-bold text-brand-teal' : 'text-brand-charcoal'}>All Selected Permits</span>
                                 </label>
 
                                 {selectedUtilities.map(util => (
@@ -344,12 +357,10 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                             {util.permits.map(pid => (
                                                 <label key={pid} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded ml-1">
                                                     <input
-                                                        type="radio"
-                                                        name="permit_select"
-                                                        value={pid}
-                                                        checked={filters.permit === pid}
-                                                        onChange={() => setFilters(prev => ({ ...prev, permit: pid }))}
-                                                        className="text-brand-teal focus:ring-brand-teal"
+                                                        type="checkbox"
+                                                        checked={(filters.permits || []).includes(pid)}
+                                                        onChange={() => togglePermit(pid)}
+                                                        className="text-brand-teal focus:ring-brand-teal rounded"
                                                     />
                                                     <span className="font-mono text-xs">{pid}</span>
                                                 </label>

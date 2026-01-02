@@ -70,6 +70,7 @@ class SSOQueryParams(BaseModel):
     utility_ids: Optional[list[str]] = Field(default=None, alias="utility_ids")
     utility_name: Optional[str] = Field(default=None, alias="utility_name")
     permit: Optional[str] = Field(default=None, alias="permit")
+    permits: Optional[list[str]] = Field(default=None, alias="permits")
     county: Optional[str] = None
     start_date: Optional[str] = Field(
         default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
@@ -104,6 +105,7 @@ class SSOQueryParams(BaseModel):
         return any(
             [
                 self.permit,
+                self.permits,
                 self.utility_id,
                 self.utility_ids,
                 self.utility_name,
@@ -135,6 +137,9 @@ class SSOQueryParams(BaseModel):
 
         if self.permit:
             all_permits.update(_resolve_permits(self.permit))
+        if self.permits:
+            for pid in self.permits:
+                all_permits.update(_resolve_permits(pid))
         if self.utility_id:
             all_permits.update(_resolve_permits(self.utility_id))
         if self.utility_ids:

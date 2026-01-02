@@ -64,6 +64,7 @@ export interface FilterState {
     utility_ids?: string[]
     utility_name?: string
     permit?: string
+    permits?: string[]
     county?: string
     start_date?: string
     end_date?: string

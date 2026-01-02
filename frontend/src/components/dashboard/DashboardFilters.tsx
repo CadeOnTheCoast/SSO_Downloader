@@ -125,6 +125,20 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     const selectedUtilityName = options?.utilities.find(u => u.id === filters.utility_id)?.name || ''
 
+    const highlightMatch = (text: string, query: string) => {
+        if (!query) return text
+        const parts = text.split(new RegExp(`(${query})`, 'gi'))
+        return (
+            <span>
+                {parts.map((part, i) =>
+                    part.toLowerCase() === query.toLowerCase()
+                        ? <span key={i} className="bg-brand-teal/20 text-brand-teal font-bold">{part}</span>
+                        : part
+                )}
+            </span>
+        )
+    }
+
     if (loadingOptions) {
         return <div className="text-brand-sage text-sm animate-pulse font-medium">Loading filters...</div>
     }
@@ -177,10 +191,10 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                             className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
                                         >
                                             <div className="flex justify-between items-start">
-                                                <div className="font-bold text-brand-charcoal">{u.name}</div>
-                                                <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{u.slug}</div>
+                                                <div className="font-bold text-brand-charcoal">{highlightMatch(u.name, utilitySearch)}</div>
+                                                <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{highlightMatch(u.slug, utilitySearch)}</div>
                                             </div>
-                                            <div className="text-xs text-brand-sage">{u.id}</div>
+                                            <div className="text-xs text-brand-sage">{highlightMatch(u.id, utilitySearch)}</div>
                                         </button>
                                     ))
                                 ) : (
@@ -234,9 +248,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                             }}
                                             className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
                                         >
-                                            <div className="font-mono text-xs font-bold text-brand-teal">{u.id}</div>
-                                            <div className="text-[10px] text-brand-sage truncate">{u.name}</div>
-                                            <div className="text-[9px] text-brand-sage/60 font-mono italic">{u.slug}</div>
+                                            <div className="font-mono text-xs font-bold text-brand-teal">{highlightMatch(u.id, permitSearch)}</div>
+                                            <div className="text-[10px] text-brand-sage truncate">{highlightMatch(u.name, permitSearch)}</div>
+                                            <div className="text-[9px] text-brand-sage/60 font-mono italic">{highlightMatch(u.slug, permitSearch)}</div>
                                         </button>
                                     ))
                                 ) : (

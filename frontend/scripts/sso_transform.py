@@ -27,15 +27,27 @@ from sso_volume import enrich_est_volume_fields, parse_est_volume
 
 
 # Mapping for canonicalizing permittee names and consolidating duplicates
+# Keys MUST be lowercase for case-insensitive lookup.
 PERMITTEE_MAP = {
-    # Baldwin County Consolidation (ALSI9902013, AL0049859)
-    "ALSI9902013": "Baldwin County Sewer Service",
-    "AL0049859": "Baldwin County Sewer Service",
+    # Baldwin County Consolidation
+    "alsi9902013": "Baldwin County Sewer Service",
+    "al0049859": "Baldwin County Sewer Service",
     "south alabama utilities services, inc.": "Baldwin County Sewer Service",
     "south alabama utility service, inc wwtp": "Baldwin County Sewer Service",
+    "south alabama utilities": "Baldwin County Sewer Service",
     "baldwin county sewer services": "Baldwin County Sewer Service",
     "baldwin county sewer service, llc": "Baldwin County Sewer Service",
     
+    # MAWSS / Mobile Consolidation
+    "board of water and sewer commissioners of the city of mobile": "MAWSS",
+    "board of water and sewer commissioners of the city of mobile alabama": "MAWSS",
+    "board of water and sewer commissioners of the city of mobile - prichard": "MAWSS",
+    "mobile area water and sewer system": "MAWSS",
+    "mobile area water & sewer": "MAWSS",
+    "mobile area water and sewer": "MAWSS",
+    "mobile water and sewer": "MAWSS",
+    "the board of water and sewer commissioners of the city of mobile": "MAWSS",
+
     # Anniston Consolidation
     "the water works & sewer board of the city of anniston": "Utilities of Anniston",
     "the water works and sewer board of the city of anniston": "Utilities of Anniston",
@@ -51,13 +63,20 @@ def simplify_permittee_name(name: str) -> str:
     if not name:
         return name
         
+    cleaned = name.strip()
+    # Apply canonical mapping FIRST (case-insensitive)
+    mapped = PERMITTEE_MAP.get(cleaned.lower())
+    if mapped:
+        return mapped
+        
     # Order patterns from most specific to least specific
     patterns = [
         r"^The Utilities Board of the City [Oo]f\s+",
         r"^The Utilities Board of the Town [Oo]f\s+",
-        r"^The Water Works (?:and|&) Sewer Board of the City [Oo]f\s+",
-        r"^The Water Works and Sanitary Sewer Board [Oo]f\s+",
-        r"^Utilities Board [Oo]f the City [Oo]f\s+",
+        r"^[Tt]he [Ww]ater [Ww]orks (?:and|&) [Ss]ewer [Bb]oard of the [Cc]ity [Oo]f\s+",
+        r"^[Tt]he [Ww]ater [Ww]orks and [Ss]anitary [Ss]ewer [Bb]oard [Oo]f\s+",
+        r"^[Uu]tilities [Bb]oard [Oo]f the [Cc]ity [Oo]f\s+",
+        r"^[Bb]oard of [Ww]ater and [Ss]ewer [Cc]ommissioners of the [Cc]ity [Oo]f\s+",
         r"^Water Works (?:and|&) Sewer Board [Oo]f the City [Oo]f\s+",
         r"^Utilities Board [Oo]f the Town [Oo]f\s+",
         r"^Utilities Board [Oo]f\s+",

@@ -61,6 +61,7 @@ export interface FilterOptions {
 
 export interface FilterState {
     utility_id?: string
+    utility_ids?: string[]
     utility_name?: string
     permit?: string
     county?: string
@@ -72,6 +73,19 @@ export interface FilterState {
     sort_order?: 'asc' | 'desc'
 }
 
+function buildParams(filters: FilterState): URLSearchParams {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value === undefined || value === null) return
+        if (Array.isArray(value)) {
+            value.forEach(v => params.append(key, v))
+        } else {
+            params.append(key, String(value))
+        }
+    })
+    return params
+}
+
 export async function fetchFilters(): Promise<FilterOptions> {
     const res = await fetch('/filters')
     if (!res.ok) throw new Error('Failed to fetch filters')
@@ -79,21 +93,21 @@ export async function fetchFilters(): Promise<FilterOptions> {
 }
 
 export async function fetchSummary(filters: FilterState): Promise<DashboardSummary> {
-    const params = new URLSearchParams(filters as any)
+    const params = buildParams(filters)
     const res = await fetch(`/summary?${params.toString()}`)
     if (!res.ok) throw new Error('Failed to fetch summary')
     return res.json()
 }
 
 export async function fetchSeriesByDate(filters: FilterState): Promise<{ points: SeriesPoint[] }> {
-    const params = new URLSearchParams(filters as any)
+    const params = buildParams(filters)
     const res = await fetch(`/series/by_date?${params.toString()}`)
     if (!res.ok) throw new Error('Failed to fetch series by date')
     return res.json()
 }
 
 export async function fetchSeriesByUtility(filters: FilterState): Promise<{ bars: BarGroup[] }> {
-    const params = new URLSearchParams(filters as any)
+    const params = buildParams(filters)
     const res = await fetch(`/series/by_utility?${params.toString()}`)
     if (!res.ok) throw new Error('Failed to fetch series by utility')
     return res.json()
@@ -106,13 +120,13 @@ export async function fetchRecords(
     sortBy?: string,
     sortOrder?: 'asc' | 'desc'
 ): Promise<{ records: SSORecord[], total: number }> {
-    const params = new URLSearchParams({
+    const params = buildParams({
         ...filters,
-        offset: offset.toString(),
-        limit: limit.toString(),
-        ...(sortBy && { sort_by: sortBy }),
-        ...(sortOrder && { sort_order: sortOrder })
-    } as any)
+        offset,
+        limit,
+        sort_by: sortBy,
+        sort_order: sortOrder
+    })
     const res = await fetch(`/records?${params.toString()}`)
     if (!res.ok) throw new Error('Failed to fetch records')
     return res.json()

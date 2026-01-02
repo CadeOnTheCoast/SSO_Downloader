@@ -67,6 +67,7 @@ def _safe_permit_map(client: SSOClient) -> dict[str, dict[str, object]]:
 
 class SSOQueryParams(BaseModel):
     utility_id: Optional[str] = Field(default=None, alias="utility_id")
+    utility_ids: Optional[list[str]] = Field(default=None, alias="utility_ids")
     utility_name: Optional[str] = Field(default=None, alias="utility_name")
     permit: Optional[str] = Field(default=None, alias="permit")
     county: Optional[str] = None
@@ -104,6 +105,7 @@ class SSOQueryParams(BaseModel):
             [
                 self.permit,
                 self.utility_id,
+                self.utility_ids,
                 self.utility_name,
                 self.county,
                 self.start_date,
@@ -115,31 +117,35 @@ class SSOQueryParams(BaseModel):
         self, permit_map: Optional[dict[str, dict[str, object]]] = None
     ) -> SSOQuery:
         county = self.county if self.county else None
-        utility_id = self.permit or self.utility_id
-
-        permit_ids: Optional[list[str]] = None
-        def _permits_from_map(value: str) -> Optional[list[str]]:
+        
+        # Collect all permit IDs from all utility sources
+        all_permits: set[str] = set()
+        
+        def _resolve_permits(value: str):
             if not permit_map or not value:
-                return None
+                return [value] if value else []
             entry = permit_map.get(value.lower())
             if entry and entry.get("permits"):
                 return list(entry["permits"])
             for details in permit_map.values():
-                permits = details.get("permits") or []
-                if value in permits:
-                    return list(permits)
-            return None
+                p_list = details.get("permits") or []
+                if value in p_list:
+                    return list(p_list)
+            return [value]
 
-        if utility_id:
-            permit_ids = _permits_from_map(utility_id) or [utility_id]
-        elif permit_map and self.utility_name:
-            permits = _permits_from_map(self.utility_name)
-            if permits:
-                permit_ids = permits
+        if self.permit:
+            all_permits.update(_resolve_permits(self.permit))
+        if self.utility_id:
+            all_permits.update(_resolve_permits(self.utility_id))
+        if self.utility_ids:
+            for uid in self.utility_ids:
+                all_permits.update(_resolve_permits(uid))
+        if self.utility_name:
+            all_permits.update(_resolve_permits(self.utility_name))
+
+        permit_ids = sorted(list(all_permits)) if all_permits else None
 
         return SSOQuery(
-            utility_id=utility_id if not permit_ids else None,
-            utility_name=self.utility_name if not permit_ids else None,
             county=county,
             permit_ids=permit_ids,
             start_date=self._parse_date(self.start_date),

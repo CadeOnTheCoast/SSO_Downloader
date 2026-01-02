@@ -80,6 +80,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         setUtilitySearch('')
         setPermitSearch('')
         setCountySearch('')
+        setShowUtilityDropdown(false)
+        setShowPermitDropdown(false)
+        setShowCountyDropdown(false)
         onFilterChange(resetFilters)
     }
 
@@ -125,7 +128,26 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         c.toLowerCase().includes(countySearch.toLowerCase())
     ) || []
 
-    const selectedUtilityName = options?.utilities.find(u => u.id === filters.utility_id)?.name || ''
+    const selectedUtilityIds = filters.utility_ids || (filters.utility_id ? [filters.utility_id] : [])
+    const selectedUtilities = options?.utilities.filter(u => selectedUtilityIds.includes(u.id)) || []
+
+    const toggleUtility = (id: string) => {
+        const current = new Set(selectedUtilityIds)
+        if (current.has(id)) {
+            current.delete(id)
+        } else {
+            current.add(id)
+        }
+        const nextIds = Array.from(current)
+
+        setFilters(prev => ({
+            ...prev,
+            utility_ids: nextIds.length > 0 ? nextIds : undefined,
+            utility_id: undefined,
+            permit: undefined
+        }))
+        setUtilitySearch('')
+    }
 
     const highlightMatch = (text: string, query: string) => {
         if (!query) return text
@@ -158,7 +180,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                         <input
                             type="text"
                             className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg pl-10 pr-10 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all"
-                            placeholder={filters.utility_id ? selectedUtilityName : "Search permittee or permit id..."}
+                            placeholder={selectedUtilityIds.length > 0 ? `${selectedUtilityIds.length} selected` : "Search permittee or permit id..."}
                             value={utilitySearch}
                             onFocus={() => setShowUtilityDropdown(true)}
                             onChange={(e) => {
@@ -166,17 +188,34 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                 setShowUtilityDropdown(true)
                             }}
                         />
-                        {filters.utility_id && (
+                        {selectedUtilityIds.length > 0 && (
                             <button
                                 type="button"
                                 onClick={() => {
-                                    handleChange('utility_id', undefined)
+                                    setFilters(prev => ({ ...prev, utility_ids: undefined, utility_id: undefined, permit: undefined }))
                                     setUtilitySearch('')
                                 }}
                                 className="absolute right-3 top-2.5 text-brand-sage hover:text-brand-teal transition-colors"
                             >
                                 <X className="h-4 w-4" />
                             </button>
+                        )}
+                        {/* Selected Badges */}
+                        {selectedUtilityIds.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedUtilities.map(u => (
+                                    <span key={u.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-brand-teal/10 text-brand-teal text-xs font-bold border border-brand-teal/20">
+                                        {u.name}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleUtility(u.id)}
+                                            className="hover:text-brand-charcoal ml-1"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
                         )}
                         {showUtilityDropdown && (
                             <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
@@ -185,22 +224,24 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                         <button
                                             key={u.id}
                                             type="button"
-                                            onClick={() => {
-                                                setFilters(prev => ({ ...prev, utility_id: u.id, permit: undefined }))
-                                                setUtilitySearch('')
-                                                setShowUtilityDropdown(false)
-                                            }}
-                                            className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
+                                            onClick={() => toggleUtility(u.id)}
+                                            className={`w-full text-left px-4 py-3 text-sm transition-colors border-b border-brand-sage/5 last:border-0 ${selectedUtilityIds.includes(u.id)
+                                                ? 'bg-brand-teal/5 hover:bg-brand-teal/10'
+                                                : 'hover:bg-brand-sage/5'
+                                                }`}
                                         >
                                             <div className="flex justify-between items-start">
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="font-bold text-brand-charcoal">{highlightMatch(u.name, utilitySearch)}</div>
+                                                        <div className={`font-bold ${selectedUtilityIds.includes(u.id) ? 'text-brand-teal' : 'text-brand-charcoal'}`}>
+                                                            {highlightMatch(u.name, utilitySearch)}
+                                                        </div>
                                                         {(u.permits || []).length > 1 && (
                                                             <span className="px-1.5 py-0.5 bg-brand-teal/10 text-brand-teal text-[9px] font-bold rounded uppercase tracking-tighter">
                                                                 {u.permits.length} Permits
                                                             </span>
                                                         )}
+                                                        {selectedUtilityIds.includes(u.id) && <span className="text-brand-teal ml-2">✓</span>}
                                                     </div>
                                                     {/* Show matched alias if different from canonical name */}
                                                     {utilitySearch.length > 1 && (u.aliases || []).find(a =>
@@ -249,43 +290,77 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
                 {/* Enhanced Permit ID Searchable Selection */}
                 <div className="space-y-2" ref={permitRef}>
-                    <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID (Selection)</label>
+                    <label className="font-heading text-xs text-brand-charcoal/60 font-bold tracking-wider">Permit ID / Outfall</label>
                     <div className="relative group">
-                        <input
-                            type="text"
-                            className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg px-3 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all uppercase placeholder:text-brand-sage/30"
-                            placeholder={filters.permit || "Search by permit/slug..."}
-                            value={permitSearch}
-                            onFocus={() => setShowPermitDropdown(true)}
-                            onChange={(e) => {
-                                setPermitSearch(e.target.value)
-                                setShowPermitDropdown(true)
-                                setFilters(prev => ({ ...prev, permit: e.target.value || undefined, utility_id: undefined }))
-                            }}
-                        />
-                        {showPermitDropdown && permitSearch.length > 0 && (
-                            <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
-                                {filteredPermits.length > 0 ? (
-                                    filteredPermits.map(u => (
-                                        <button
-                                            key={u.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined }))
-                                                setPermitSearch('')
-                                                setShowPermitDropdown(false)
-                                            }}
-                                            className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
-                                        >
-                                            <div className="font-mono text-xs font-bold text-brand-teal">{highlightMatch(u.id, permitSearch)}</div>
-                                            <div className="text-[10px] text-brand-sage truncate">{highlightMatch(u.name, permitSearch)}</div>
-                                            <div className="text-[9px] text-brand-sage/60 font-mono italic">{highlightMatch(u.slug, permitSearch)}</div>
-                                        </button>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-3 text-sm text-brand-sage italic">No matches found</div>
-                                )}
+                        {/* Radio buttons for single utility with multiple permits */}
+                        {selectedUtilityIds.length === 1 && (selectedUtilities[0]?.permits || []).length > 0 ? (
+                            <div className="bg-slate-50 border border-brand-sage/20 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                                <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded">
+                                    <input
+                                        type="radio"
+                                        name="permit_select"
+                                        value=""
+                                        checked={!filters.permit}
+                                        onChange={() => setFilters(prev => ({ ...prev, permit: undefined }))}
+                                        className="text-brand-teal focus:ring-brand-teal"
+                                    />
+                                    <span className={!filters.permit ? 'font-bold text-brand-teal' : 'text-brand-charcoal'}>All Permits</span>
+                                </label>
+                                {selectedUtilities[0].permits.map(pid => (
+                                    <label key={pid} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-brand-sage/5 p-1 rounded">
+                                        <input
+                                            type="radio"
+                                            name="permit_select"
+                                            value={pid}
+                                            checked={filters.permit === pid}
+                                            onChange={() => setFilters(prev => ({ ...prev, permit: pid }))}
+                                            className="text-brand-teal focus:ring-brand-teal"
+                                        />
+                                        <span className="font-mono text-xs">{pid}</span>
+                                    </label>
+                                ))}
                             </div>
+                        ) : (
+                            // Standard Search Input
+                            <>
+                                <input
+                                    type="text"
+                                    className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg px-3 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all uppercase placeholder:text-brand-sage/30"
+                                    placeholder={filters.permit || "Search by permit/slug..."}
+                                    value={permitSearch}
+                                    onFocus={() => setShowPermitDropdown(true)}
+                                    onChange={(e) => {
+                                        setPermitSearch(e.target.value)
+                                        setShowPermitDropdown(true)
+                                        setFilters(prev => ({ ...prev, permit: e.target.value || undefined, utility_id: undefined }))
+                                    }}
+                                />
+                                {showPermitDropdown && permitSearch.length > 0 && (
+                                    <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
+                                        {filteredPermits.length > 0 ? (
+                                            filteredPermits.map(u => (
+                                                <button
+                                                    key={u.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        // For permit search, we might set utility context if it matches perfectly
+                                                        setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined }))
+                                                        setPermitSearch('')
+                                                        setShowPermitDropdown(false)
+                                                    }}
+                                                    className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
+                                                >
+                                                    <div className="font-mono text-xs font-bold text-brand-teal">{highlightMatch(u.id, permitSearch)}</div>
+                                                    <div className="text-[10px] text-brand-sage truncate">{highlightMatch(u.name, permitSearch)}</div>
+                                                    <div className="text-[9px] text-brand-sage/60 font-mono italic">{highlightMatch(u.slug, permitSearch)}</div>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-3 text-sm text-brand-sage italic">No matches found</div>
+                                        )}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

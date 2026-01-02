@@ -131,7 +131,12 @@ export default function DashboardPage() {
     const getFullCsvUrl = () => {
         const params = new URLSearchParams()
         Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined) params.append(key, value.toString())
+            if (value === undefined || value === null) return
+            if (Array.isArray(value)) {
+                value.forEach(v => params.append(key, v))
+            } else {
+                params.append(key, value.toString())
+            }
         })
         return `/api/ssos.csv?${params.toString()}`
     }

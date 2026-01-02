@@ -81,11 +81,8 @@ export function SSOTable({
                                 >
                                     <div className="flex items-center justify-end">Volume (Gal) <SortIcon column="volume_gallons" /></div>
                                 </th>
-                                <th
-                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                    onClick={() => handleSort('cause')}
-                                >
-                                    <div className="flex items-center">Cause <SortIcon column="cause" /></div>
+                                <th className="px-6 py-4">
+                                    <div className="flex items-center text-brand-sage/80 cursor-default">Location</div>
                                 </th>
                                 <th
                                     className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
@@ -122,8 +119,19 @@ export function SSOTable({
                                         <td className={`px-6 py-4 text-right tabular-nums ${volClass} ${bgClass}`}>
                                             {vol.toLocaleString()}
                                         </td>
-                                        <td className="px-6 py-4 max-w-[200px] truncate italic text-brand-charcoal/60" title={record.cause}>
-                                            {record.cause}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {record.latitude && record.longitude ? (
+                                                <a
+                                                    href={`https://www.google.com/maps/search/?api=1&query=${record.latitude},${record.longitude}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-brand-teal hover:underline font-mono text-xs"
+                                                >
+                                                    {record.latitude.toFixed(4)}, {record.longitude.toFixed(4)}
+                                                </a>
+                                            ) : (
+                                                <span className="text-brand-sage/40 text-xs">N/A</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 max-w-[200px] truncate font-medium text-brand-sage" title={record.receiving_water}>
                                             {record.receiving_water}

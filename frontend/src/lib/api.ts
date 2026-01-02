@@ -46,6 +46,8 @@ export interface SSORecord {
     cause: string
     receiving_water: string
     address: string
+    latitude?: number
+    longitude?: number
 }
 
 export interface FilterOptions {

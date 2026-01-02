@@ -135,18 +135,22 @@ class SSOQueryParams(BaseModel):
                     return list(p_list)
             return [value]
 
+        # 1. Check for explicit permit filters first
         if self.permit:
             all_permits.update(_resolve_permits(self.permit))
         if self.permits:
             for pid in self.permits:
                 all_permits.update(_resolve_permits(pid))
-        if self.utility_id:
-            all_permits.update(_resolve_permits(self.utility_id))
-        if self.utility_ids:
-            for uid in self.utility_ids:
-                all_permits.update(_resolve_permits(uid))
-        if self.utility_name:
-            all_permits.update(_resolve_permits(self.utility_name))
+        
+        # 2. If NO explicit permits, fall back to utility-wide permits
+        if not all_permits:
+            if self.utility_id:
+                all_permits.update(_resolve_permits(self.utility_id))
+            if self.utility_ids:
+                for uid in self.utility_ids:
+                    all_permits.update(_resolve_permits(uid))
+            if self.utility_name:
+                all_permits.update(_resolve_permits(self.utility_name))
 
         permit_ids = sorted(list(all_permits)) if all_permits else None
 
@@ -410,6 +414,8 @@ def series_by_utility(
 class RecordsQueryParams(SSOQueryParams):
     offset: int = Field(default=0, ge=0)
     limit: Optional[int] = Field(default=200, ge=1, le=MAX_WEB_RECORDS)
+    sort_by: Optional[str] = None
+    sort_order: Optional[str] = "desc"
 
 
 def _fetch_normalized_records(
@@ -422,6 +428,22 @@ def _fetch_normalized_records(
     """Shared record fetching logic for JSON table endpoints."""
 
     query = _to_query(params, client)
+
+    if params.sort_by:
+        mapping = {
+            "volume_gallons": "volume_gallons",
+            "date_sso_began": "date_sso_began",
+            "utility_name": "permittee",
+            "county": "county",
+            "cause": "cause",
+            "receiving_water": "rec_stream",
+        }
+        field = mapping.get(params.sort_by)
+        if field:
+            direction = "DESC" if params.sort_order == "desc" else "ASC"
+            query.extra_params = query.extra_params or {}
+            query.extra_params["orderByFields"] = f"{field} {direction}"
+
     try:
         query.validate()
     except ValueError as exc:
@@ -458,8 +480,8 @@ def _serialize_record(record) -> dict[str, object]:
         "cause": record.cause,
         "receiving_water": record.receiving_water,
         "address": record.location_desc,
-        "x": record.x,
-        "y": record.y,
+        "latitude": record.y,
+        "longitude": record.x,
     }
 
 

@@ -91,26 +91,34 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         onFilterChange(filters)
     }
 
-    // Enhanced utility filtering (Name, Slug, ID, Aliases)
+    // Enhanced utility filtering (Name, Slug, ID, Aliases) with "Google-style" word completion
     const filteredUtilities = (options?.utilities.filter(u => {
-        const query = utilitySearch.toLowerCase()
+        const query = utilitySearch.toLowerCase().trim()
         if (!query) return true
-        return u.name.toLowerCase().includes(query) ||
-            u.slug.toLowerCase().includes(query) ||
-            u.id.toLowerCase().includes(query) ||
-            (u.aliases || []).some(a => a.toLowerCase().includes(query))
+
+        const wordStartsWith = (text: string) => {
+            const words = text.toLowerCase().split(/[\s\-_]+/)
+            return words.some(w => w.startsWith(query))
+        }
+
+        const nameMatch = wordStartsWith(u.name)
+        const slugMatch = wordStartsWith(u.slug)
+        const aliasMatch = (u.aliases || []).some(a => wordStartsWith(a))
+        const idMatch = u.id.toLowerCase().includes(query) // Keep ID flexible for numeric searches
+
+        return nameMatch || slugMatch || aliasMatch || idMatch
     }) || []).sort((a, b) => {
-        const query = utilitySearch.toLowerCase()
+        const query = utilitySearch.toLowerCase().trim()
         if (!query) return 0
+
         const aName = a.name.toLowerCase()
         const bName = b.name.toLowerCase()
-        // Exact match params
-        const aExact = aName === query || a.id.toLowerCase() === query || a.slug.toLowerCase() === query
-        const bExact = bName === query || b.id.toLowerCase() === query || b.slug.toLowerCase() === query
-        if (aExact && !bExact) return -1
-        if (!aExact && bExact) return 1
 
-        // Starts with params
+        // 1. Exact Name/ID Match
+        if (aName === query || a.id.toLowerCase() === query) return -1
+        if (bName === query || b.id.toLowerCase() === query) return 1
+
+        // 2. Starts With Name (Prefix)
         const aStarts = aName.startsWith(query)
         const bStarts = bName.startsWith(query)
         if (aStarts && !bStarts) return -1

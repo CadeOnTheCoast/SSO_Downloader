@@ -13,10 +13,11 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     const [options, setOptions] = useState<FilterOptions | null>(null)
     const [filters, setFilters] = useState<FilterState>(() => {
         const now = new Date()
+        const prevYear = now.getFullYear() - 1
         return {
-            start_date: `${now.getFullYear()}-01-01`,
-            end_date: now.toISOString().split('T')[0],
-            limit: 1000
+            start_date: `${prevYear}-01-01`,
+            end_date: `${prevYear}-12-31`,
+            limit: 2000
         }
     })
     const [loadingOptions, setLoadingOptions] = useState(true)

@@ -41,14 +41,15 @@ export default function DashboardPage() {
             if (data.user) setUserEmail(data.user.email || 'User')
         })
 
-        // Initialize with YTD
+        // Initialize with previous calendar year
         const now = new Date()
-        const startOfYear = `${now.getFullYear()}-01-01`
-        const today = now.toISOString().split('T')[0]
+        const prevYear = now.getFullYear() - 1
+        const startDate = `${prevYear}-01-01`
+        const endDate = `${prevYear}-12-31`
 
         handleFilterChange({
-            start_date: startOfYear,
-            end_date: today,
+            start_date: startDate,
+            end_date: endDate,
             limit: 2000
         })
     }, [])

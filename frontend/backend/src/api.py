@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import io
 import sys
-import math
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -68,10 +67,10 @@ def _safe_permit_map(client: SSOClient) -> dict[str, dict[str, object]]:
 
 class SSOQueryParams(BaseModel):
     utility_id: Optional[str] = Field(default=None, alias="utility_id")
-    utility_ids: Optional[list[str]] = Field(default=None, alias="utility_ids")
+    utility_ids: Optional[list[str]] = Query(default=None, alias="utility_ids")
     utility_name: Optional[str] = Field(default=None, alias="utility_name")
     permit: Optional[str] = Field(default=None, alias="permit")
-    permits: Optional[list[str]] = Field(default=None, alias="permits")
+    permits: Optional[list[str]] = Query(default=None, alias="permits")
     county: Optional[str] = None
     start_date: Optional[str] = Field(
         default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
@@ -476,19 +475,6 @@ def _fetch_normalized_records(
     return sliced, len(normalized), safe_limit
 
 
-def project_web_mercator_to_latlon(x, y):
-    if x is None or y is None:
-        return None, None
-    # Check if already lat/long (simple heuristic)
-    if abs(x) <= 180 and abs(y) <= 90:
-        return x, y
-        
-    lon = (x / 20037508.34) * 180
-    lat = (y / 20037508.34) * 180
-    lat = 180 / math.pi * (2 * math.atan(math.exp(lat * math.pi / 180)) - math.pi / 2)
-    return lon, lat
-
-
 def _serialize_record(record) -> dict[str, object]:
     return {
         "id": record.sso_id,
@@ -505,8 +491,8 @@ def _serialize_record(record) -> dict[str, object]:
         "cause": record.cause,
         "receiving_water": record.receiving_water,
         "address": record.location_desc,
-        "latitude": project_web_mercator_to_latlon(record.x, record.y)[1],
-        "longitude": project_web_mercator_to_latlon(record.x, record.y)[0],
+        "latitude": record.y,
+        "longitude": record.x,
     }
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import sys
+import json
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -114,7 +115,8 @@ class SSOQueryParams:
     def to_sso_query(
         self, permit_map: Optional[dict[str, dict[str, object]]] = None
     ) -> SSOQuery:
-        county = self.county if self.county else None
+        # Backend doesn't support county filtering reliably, so we filter in Python
+        county = None 
         
         # Collect all permit IDs from all utility sources
         all_permits: set[str] = set()
@@ -261,25 +263,7 @@ def _build_filename(params: SSOQueryParams) -> str:
 def _download_csv_response(
     params: SSOQueryParams, client: SSOClient
 ) -> StreamingResponse:
-    _ensure_filters(params)
-    query = _to_query(params, client)
-    try:
-        query.validate()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        safe_limit = params.bounded_limit(
-            default=MAX_WEB_RECORDS, maximum=MAX_WEB_RECORDS
-        )
-        records = client.fetch_ssos(query=query, limit=safe_limit)
-    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    for record in records:
-        enrich_est_volume_fields(record)
-
-    normalized_records = normalize_sso_records(records)
+    normalized_records = _fetch_all_filtered_records(params, client, default_limit=MAX_WEB_RECORDS)
     csv_rows = [sso_record_to_csv_row(record) for record in normalized_records]
 
     buffer = io.StringIO()
@@ -305,24 +289,7 @@ def download_csv(
 
 
 def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
-    query = _to_query(params, client)
-    try:
-        query.validate()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        safe_limit = params.bounded_limit(
-            default=MAX_WEB_RECORDS, maximum=MAX_WEB_RECORDS
-        )
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit)
-    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    for record in raw_records:
-        enrich_est_volume_fields(record)
-
-    records_norm = normalize_sso_records(raw_records)
+    records_norm = _fetch_all_filtered_records(params, client, default_limit=MAX_WEB_RECORDS)
     summary = build_dashboard_summary(
         records_norm,
         date_range={"min": params.start_date, "max": params.end_date},
@@ -356,18 +323,9 @@ def series_by_date(
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
-    query = _to_query(params, client)
-    try:
-        query.validate()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        raw_records = client.fetch_ssos(query=query, limit=params.limit)
-    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    records_norm = normalize_sso_records(raw_records)
+    records_norm = _fetch_all_filtered_records(
+        params, client, default_limit=params.limit or MAX_WEB_RECORDS
+    )
     series = time_series_by_date(records_norm)
 
     return {"points": series}
@@ -378,18 +336,9 @@ def series_by_utility(
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
-    query = _to_query(params, client)
-    try:
-        query.validate()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        raw_records = client.fetch_ssos(query=query, limit=params.limit)
-    except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    records_norm = normalize_sso_records(raw_records)
+    records_norm = _fetch_all_filtered_records(
+        params, client, default_limit=params.limit or MAX_WEB_RECORDS
+    )
     grouped = summarize_volume_by_utility(records_norm)
     counts: dict[str, int] = {}
     for record in records_norm:
@@ -464,14 +413,17 @@ def _fetch_normalized_records(
     db_sort_field = db_sort_map.get(params.sort_by)
     safe_limit = params.bounded_limit(default=params.limit or default_limit, maximum=maximum)
 
-    # If sorting by DB field, efficient fetch using efficient limit
-    if db_sort_field:
+    # Check if we need to filter by county in Python
+    python_county_filter = params.county
+
+    # If sorting by DB field AND no python filtering needed, efficient fetch
+    if db_sort_field and not python_county_filter:
         direction = "DESC" if params.sort_order == "desc" else "ASC"
         query.extra_params = query.extra_params or {}
         query.extra_params["orderByFields"] = f"{db_sort_field} {direction}"
         fetch_limit = safe_limit + params.offset
     else:
-        # If sorting by Volume (computed) or unknown, fetch everything (capped) to sort in memory
+        # If sorting by Volume (computed) or County Filter, fetch everything (capped)
         fetch_limit = maximum
 
     try:
@@ -489,23 +441,170 @@ def _fetch_normalized_records(
 
     normalized = normalize_sso_records(raw_records)
     
-    # Python Sort for non-DB fields (Volume)
-    if not db_sort_field and params.sort_by == "volume_gallons":
-         normalized.sort(
-             key=lambda r: r.volume_gallons or 0, 
-             reverse=(params.sort_order == "desc")
-         )
+    # Enrich with County if needed for Filtering or Sorting
+    # (Serializer will enrich displayed records JIT, but we need it earlier here)
+    if python_county_filter or params.sort_by == "county":
+        for r in normalized:
+            if not r.county and r.x and r.y:
+                r.county = get_county(r.y, r.x)
+
+    # Apply Python County Filter
+    if python_county_filter:
+         target = python_county_filter.lower().replace(" county", "").strip()
+         normalized = [
+             r for r in normalized 
+             if r.county and r.county.lower().replace(" county", "").strip() == target
+         ]
+    
+    # Python Sort for non-DB fields (Volume or County)
+    if not db_sort_field:
+         if params.sort_by == "volume_gallons":
+             normalized.sort(
+                 key=lambda r: r.volume_gallons or 0, 
+                 reverse=(params.sort_order == "desc")
+             )
+         elif params.sort_by == "county":
+             normalized.sort(
+                 key=lambda r: r.county or "", 
+                 reverse=(params.sort_order == "desc")
+             )
          
     sliced = normalized[params.offset : params.offset + safe_limit]
     return sliced, len(normalized), safe_limit
 
 
+AL_COUNTY_FEATURES = None
+
+
+def _load_counties():
+    global AL_COUNTY_FEATURES
+    if AL_COUNTY_FEATURES is not None:
+        return
+
+    # Try paths relative to CWD (root) and this file
+    # Common deployment paths:
+    # 1. Root relative: frontend/data/al_counties.json
+    # 2. File relative: ../../../data/al_counties.json
+    
+    paths = [
+        Path("frontend/data/al_counties.json"),
+        Path(__file__).resolve().parents[2] / "data" / "al_counties.json"
+    ]
+    
+    for p in paths:
+        if p.exists():
+            try:
+                with open(p, "r") as f:
+                    data = json.load(f)
+                    AL_COUNTY_FEATURES = data["features"]
+                    # print(f"Loaded {len(AL_COUNTY_FEATURES)} counties from {p}")
+                    return
+            except Exception as e:
+                print(f"Error loading counties from {p}: {e}")
+                
+    print("Warning: Could not find al_counties.json")
+    AL_COUNTY_FEATURES = []
+
+
+def point_in_polygon(x, y, poly) -> bool:
+    """Ray casting algorithm for Point in Polygon."""
+    n = len(poly)
+    inside = False
+    p1x, p1y = poly[0]
+    for i in range(1, n + 1):
+        p2x, p2y = poly[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    return inside
+
+
+def get_county(lat: Optional[float], lon: Optional[float]) -> Optional[str]:
+    _load_counties()
+    if not AL_COUNTY_FEATURES or lat is None or lon is None:
+        return None
+
+    # Brute force 67 counties is fast enough (<10ms)
+    for feature in AL_COUNTY_FEATURES:
+        geom = feature["geometry"]
+        coords = geom["coordinates"]
+        
+        match = False
+        if geom["type"] == "Polygon":
+            if point_in_polygon(lon, lat, coords[0]):
+                match = True
+        elif geom["type"] == "MultiPolygon":
+            for poly in coords:
+                if point_in_polygon(lon, lat, poly[0]):
+                    match = True
+                    break
+        
+        if match:
+            return feature["properties"].get("NAME") 
+    return None
+
+
+def _fetch_all_filtered_records(
+    params: SSOQueryParams, client: SSOClient, default_limit: int = MAX_WEB_RECORDS
+):
+    """Fetch, normalize, enrich (county), and filter records."""
+    query = _to_query(params, client)
+    
+    python_county_filter = params.county
+    
+    # If filtering by county, we must fetch max records to filter in memory
+    if python_county_filter:
+        limit = MAX_WEB_RECORDS
+    else:
+        # Otherwise respect param limit or default
+        # usage of params.limit logic depends on passed params object
+        limit = params.bounded_limit(default=default_limit, maximum=MAX_WEB_RECORDS)
+        
+    try:
+        query.validate()
+        raw_records = client.fetch_ssos(query=query, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SSOClientError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    for r in raw_records:
+        enrich_est_volume_fields(r)
+
+    normalized = normalize_sso_records(raw_records)
+    
+    # Enrich
+    for r in normalized:
+        if not r.county and r.x and r.y:
+            r.county = get_county(r.y, r.x)
+            
+    # Filter
+    if python_county_filter:
+         target = python_county_filter.lower().replace(" county", "").strip()
+         normalized = [
+             r for r in normalized 
+             if r.county and r.county.lower().replace(" county", "").strip() == target
+         ]
+         
+    return normalized
+
+
 def _serialize_record(record) -> dict[str, object]:
+    # Determine county if missing
+    county = record.county
+    if not county and record.y and record.x:
+        county = get_county(record.y, record.x)
+
     return {
         "id": record.sso_id,
         "utility_id": record.utility_id,
         "utility_name": record.utility_name,
-        "county": record.county,
+        "county": county,
         "date_sso_began": record.date_sso_began.isoformat()
         if record.date_sso_began
         else None,

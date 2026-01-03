@@ -65,36 +65,32 @@ def _safe_permit_map(client: SSOClient) -> dict[str, dict[str, object]]:
         return {}
 
 
-class SSOQueryParams(BaseModel):
-    utility_id: Optional[str] = Field(default=None, alias="utility_id")
-    utility_ids: Optional[list[str]] = Query(default=None, alias="utility_ids")
-    utility_name: Optional[str] = Field(default=None, alias="utility_name")
-    permit: Optional[str] = Field(default=None, alias="permit")
-    permits: Optional[list[str]] = Query(default=None, alias="permits")
-    county: Optional[str] = None
-    start_date: Optional[str] = Field(
-        default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
-    )
-    end_date: Optional[str] = Field(
-        default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
-    )
-    limit: Optional[int] = Field(default=None, ge=1, le=50000)
-
-    @validator("utility_id", "utility_name", "permit", "county", pre=True)
-    def _handle_undefined(cls, value):
-        if value in ("undefined", "null", ""):
-            return None
-        return value
-
-    @field_validator("start_date", "end_date")
-    def _validate_date(cls, value: Optional[str]):
-        if value is None:
-            return value
-        try:
-            datetime.strptime(value, "%Y-%m-%d")
-        except ValueError as exc:  # pragma: no cover - handled by pydantic already
-            raise ValueError("Dates must use YYYY-MM-DD format") from exc
-        return value
+class SSOQueryParams:
+    def __init__(
+        self,
+        utility_id: Optional[str] = Query(None),
+        utility_ids: Optional[list[str]] = Query(None),
+        utility_name: Optional[str] = Query(None),
+        permit: Optional[str] = Query(None),
+        permits: Optional[list[str]] = Query(None),
+        county: Optional[str] = Query(None),
+        start_date: Optional[str] = Query(
+            None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
+        ),
+        end_date: Optional[str] = Query(
+            None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
+        ),
+        limit: Optional[int] = Query(None, ge=1, le=50000),
+    ):
+        self.utility_id = utility_id
+        self.utility_ids = utility_ids
+        self.utility_name = utility_name
+        self.permit = permit
+        self.permits = permits
+        self.county = county
+        self.start_date = start_date
+        self.end_date = end_date
+        self.limit = limit
 
     def _parse_date(self, value: Optional[str]):
         if value is None:
@@ -412,10 +408,39 @@ def series_by_utility(
 
 
 class RecordsQueryParams(SSOQueryParams):
-    offset: int = Field(default=0, ge=0)
-    limit: Optional[int] = Field(default=200, ge=1, le=MAX_WEB_RECORDS)
-    sort_by: Optional[str] = None
-    sort_order: Optional[str] = "desc"
+    def __init__(
+        self,
+        utility_id: Optional[str] = Query(None),
+        utility_ids: Optional[list[str]] = Query(None),
+        utility_name: Optional[str] = Query(None),
+        permit: Optional[str] = Query(None),
+        permits: Optional[list[str]] = Query(None),
+        county: Optional[str] = Query(None),
+        start_date: Optional[str] = Query(
+            None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
+        ),
+        end_date: Optional[str] = Query(
+            None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD"
+        ),
+        limit: Optional[int] = Query(200, ge=1, le=MAX_WEB_RECORDS),
+        offset: int = Query(0, ge=0),
+        sort_by: Optional[str] = Query(None),
+        sort_order: Optional[str] = Query("desc"),
+    ):
+        super().__init__(
+            utility_id=utility_id,
+            utility_ids=utility_ids,
+            utility_name=utility_name,
+            permit=permit,
+            permits=permits,
+            county=county,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+        )
+        self.offset = offset
+        self.sort_by = sort_by
+        self.sort_order = sort_order
 
 
 def _fetch_normalized_records(

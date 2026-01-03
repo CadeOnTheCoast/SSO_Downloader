@@ -21,8 +21,10 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
     })
     const [loadingOptions, setLoadingOptions] = useState(true)
-    const [utilitySearch, setUtilitySearch] = useState('')
-    const [permitSearch, setPermitSearch] = useState('')
+    const [utilitySearch, setUtilitySearch] = useState('') // Debounced query for filtering
+    const [utilityInput, setUtilityInput] = useState('')   // Instant input value
+    const [permitSearch, setPermitSearch] = useState('')   // Debounced query for filtering
+    const [permitInput, setPermitInput] = useState('')     // Instant input value
     const [countySearch, setCountySearch] = useState('')
     const [showUtilityDropdown, setShowUtilityDropdown] = useState(false)
     const [showPermitDropdown, setShowPermitDropdown] = useState(false)
@@ -30,6 +32,16 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     const utilityRef = useRef<HTMLDivElement>(null)
     const permitRef = useRef<HTMLDivElement>(null)
     const countyRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const timer = setTimeout(() => setUtilitySearch(utilityInput), 300)
+        return () => clearTimeout(timer)
+    }, [utilityInput])
+
+    useEffect(() => {
+        const timer = setTimeout(() => setPermitSearch(permitInput), 300)
+        return () => clearTimeout(timer)
+    }, [permitInput])
 
     useEffect(() => {
         fetchFilters()
@@ -78,7 +90,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
         setFilters(resetFilters)
         setUtilitySearch('')
+        setUtilityInput('')
         setPermitSearch('')
+        setPermitInput('')
         setCountySearch('')
         setShowUtilityDropdown(false)
         setShowPermitDropdown(false)
@@ -166,13 +180,16 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
         const nextIds = Array.from(current)
 
-        setFilters(prev => ({
-            ...prev,
+        const nextFilters = {
+            ...filters,
             utility_ids: nextIds.length > 0 ? nextIds : undefined,
             utility_id: undefined,
             permit: undefined
-        }))
-        setUtilitySearch('')
+        }
+
+        setFilters(nextFilters)
+        setUtilityInput('')
+        onFilterChange(nextFilters)
     }
 
     const togglePermit = (id: string) => {
@@ -183,11 +200,15 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
             current.add(id)
         }
         const nextIds = Array.from(current)
-        setFilters(prev => ({
-            ...prev,
+
+        const nextFilters = {
+            ...filters,
             permits: nextIds.length > 0 ? nextIds : undefined,
             permit: undefined // Clear legacy single permit
-        }))
+        }
+
+        setFilters(nextFilters)
+        onFilterChange(nextFilters)
     }
 
     const highlightMatch = (text: string, query: string) => {
@@ -222,19 +243,20 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                             type="text"
                             className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg pl-10 pr-10 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all"
                             placeholder={selectedUtilityIds.length > 0 ? `${selectedUtilityIds.length} selected` : "Search permittee or permit id..."}
-                            value={utilitySearch}
+                            value={utilityInput}
                             onFocus={() => setShowUtilityDropdown(true)}
                             onChange={(e) => {
-                                setUtilitySearch(e.target.value)
+                                setUtilityInput(e.target.value)
                                 setShowUtilityDropdown(true)
                             }}
+                            autoComplete="off"
                         />
                         {selectedUtilityIds.length > 0 && (
                             <button
                                 type="button"
                                 onClick={() => {
                                     setFilters(prev => ({ ...prev, utility_ids: undefined, utility_id: undefined, permit: undefined }))
-                                    setUtilitySearch('')
+                                    setUtilityInput('')
                                 }}
                                 className="absolute right-3 top-2.5 text-brand-sage hover:text-brand-teal transition-colors"
                             >
@@ -315,7 +337,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                             <div className="mt-2 not-italic">
                                                 Did you mean <button
                                                     type="button"
-                                                    onClick={() => setUtilitySearch(suggestion.name)}
+                                                    onClick={() => setUtilityInput(suggestion.name)}
                                                     className="text-brand-teal hover:underline font-bold"
                                                 >
                                                     {suggestion.name}
@@ -376,13 +398,13 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                     type="text"
                                     className="w-full bg-slate-50 border border-brand-sage/20 rounded-lg px-3 py-2.5 text-sm text-brand-charcoal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all uppercase placeholder:text-brand-sage/30"
                                     placeholder={filters.permit || "Search by permit/slug..."}
-                                    value={permitSearch}
+                                    value={permitInput}
                                     onFocus={() => setShowPermitDropdown(true)}
                                     onChange={(e) => {
-                                        setPermitSearch(e.target.value)
+                                        setPermitInput(e.target.value)
                                         setShowPermitDropdown(true)
-                                        // Removed setFilters on keystroke to prevent lag/wonkiness
                                     }}
+                                    autoComplete="off"
                                 />
                                 {showPermitDropdown && permitSearch.length > 0 && (
                                     <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
@@ -393,7 +415,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                     type="button"
                                                     onClick={() => {
                                                         setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined, utility_ids: undefined }))
-                                                        setPermitSearch('')
+                                                        setPermitInput('')
                                                         setShowPermitDropdown(false)
                                                     }}
                                                     className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
@@ -428,6 +450,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                 setCountySearch(e.target.value)
                                 setShowCountyDropdown(true)
                             }}
+                            autoComplete="off"
                         />
                         <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-brand-sage/40 pointer-events-none" />
                         {showCountyDropdown && (

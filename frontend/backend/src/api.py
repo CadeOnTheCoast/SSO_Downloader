@@ -429,31 +429,34 @@ def _fetch_normalized_records(
     """Shared record fetching logic for JSON table endpoints."""
 
     query = _to_query(params, client)
+    
+    db_sort_map = {
+        "date_sso_began": "date_sso_began",
+        "utility_name": "permittee",
+        "county": "county",
+        "receiving_water": "rec_stream",
+    }
+    
+    db_sort_field = db_sort_map.get(params.sort_by)
+    safe_limit = params.bounded_limit(default=params.limit or default_limit, maximum=maximum)
 
-    if params.sort_by:
-        mapping = {
-            "volume_gallons": "volume_gallons",
-            "date_sso_began": "date_sso_began",
-            "utility_name": "permittee",
-            "county": "county",
-            "cause": "cause",
-            "receiving_water": "rec_stream",
-        }
-        field = mapping.get(params.sort_by)
-        if field:
-            direction = "DESC" if params.sort_order == "desc" else "ASC"
-            query.extra_params = query.extra_params or {}
-            query.extra_params["orderByFields"] = f"{field} {direction}"
+    # If sorting by DB field, efficient fetch using efficient limit
+    if db_sort_field:
+        direction = "DESC" if params.sort_order == "desc" else "ASC"
+        query.extra_params = query.extra_params or {}
+        query.extra_params["orderByFields"] = f"{db_sort_field} {direction}"
+        fetch_limit = safe_limit + params.offset
+    else:
+        # If sorting by Volume (computed) or unknown, fetch everything (capped) to sort in memory
+        fetch_limit = maximum
 
     try:
         query.validate()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    safe_limit = params.bounded_limit(default=params.limit or default_limit, maximum=maximum)
-
     try:
-        raw_records = client.fetch_ssos(query=query, limit=safe_limit + params.offset)
+        raw_records = client.fetch_ssos(query=query, limit=fetch_limit)
     except SSOClientError as exc:  # pragma: no cover - network errors are mocked in tests
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -461,6 +464,14 @@ def _fetch_normalized_records(
         enrich_est_volume_fields(record)
 
     normalized = normalize_sso_records(raw_records)
+    
+    # Python Sort for non-DB fields (Volume)
+    if not db_sort_field and params.sort_by == "volume_gallons":
+         normalized.sort(
+             key=lambda r: r.volume_gallons or 0, 
+             reverse=(params.sort_order == "desc")
+         )
+         
     sliced = normalized[params.offset : params.offset + safe_limit]
     return sliced, len(normalized), safe_limit
 

@@ -16,13 +16,7 @@ const COLORS = ['#6B8982', '#4AA0AF', '#8CCAAE', '#A2D3F3', '#35403A', '#BA4A3E'
 const TEXT_COLOR = '#35403A';
 const GRID_COLOR = '#E2E8E7'; // Light sage-tinted grid
 
-function getUtilitySlug(name: string): string {
-    if (!name) return ""
-    // Ensure we are using the new slug logic
-    return name.toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-}
+
 
 export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }: SSOChartsProps) {
     console.log("Rendering SSOCharts with new slug logic");
@@ -106,19 +100,23 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tickFormatter={(value) => getUtilitySlug(value || '')}
+                                    tickFormatter={(value) => value}
                                     className="font-medium"
                                 />
                                 <Tooltip
                                     cursor={{ fill: '#F8F9FB' }}
                                     contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8E7', borderRadius: '8px' }}
                                     itemStyle={{ color: TEXT_COLOR, fontWeight: 600 }}
-                                    formatter={(value: any, name: any, props: any) => [
+                                    formatter={(value: any) => [
                                         `${(value ?? 0).toLocaleString()} gal`,
-                                        props.payload.label || 'Unknown'
+                                        "Volume"
                                     ]}
                                 />
-                                <Bar dataKey="total_volume_gallons" fill="#6B8982" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="total_volume_gallons" radius={[0, 4, 4, 0]}>
+                                    {barGroups.slice(0, 10).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -190,16 +188,23 @@ export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }
                                         fontSize={10}
                                         tickLine={false}
                                         axisLine={false}
-                                        tickFormatter={(value) => value.length > 25 ? `${value.substring(0, 22)}...` : value}
+                                        tickFormatter={(value) => value}
                                         className="font-medium"
                                     />
                                     <Tooltip
                                         cursor={{ fill: '#F8F9FB' }}
                                         contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8E7', borderRadius: '8px' }}
                                         itemStyle={{ color: TEXT_COLOR, fontWeight: 600 }}
-                                        formatter={(value: any) => `${(value ?? 0).toLocaleString()} gal`}
+                                        formatter={(value: any) => [
+                                            `${(value ?? 0).toLocaleString()} gal`,
+                                            "Volume"
+                                        ]}
                                     />
-                                    <Bar dataKey="total_volume" fill="#8CCAAE" radius={[0, 4, 4, 0]} />
+                                    <Bar dataKey="total_volume" radius={[0, 4, 4, 0]}>
+                                        {receivingWaters.slice(0, 10).map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (

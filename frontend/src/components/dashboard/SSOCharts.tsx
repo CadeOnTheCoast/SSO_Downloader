@@ -17,13 +17,15 @@ const TEXT_COLOR = '#35403A';
 const GRID_COLOR = '#E2E8E7'; // Light sage-tinted grid
 
 function getUtilitySlug(name: string): string {
-    return name
-        .replace(/Board|Commission|Authority|Utilities|Utility|Water|Sewer|Works|Board of/gi, '')
-        .trim()
-        .substring(0, 15);
+    if (!name) return ""
+    // Ensure we are using the new slug logic
+    return name.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
 }
 
 export function SSOCharts({ timeSeries, barGroups, receivingWaters, onPieClick }: SSOChartsProps) {
+    console.log("Rendering SSOCharts with new slug logic");
     const showTimeSeries = timeSeries && timeSeries.length > 0;
     const totalVolume = barGroups.reduce((acc, curr) => acc + curr.total_volume_gallons, 0);
 

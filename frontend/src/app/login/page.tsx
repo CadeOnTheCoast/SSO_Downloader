@@ -1,21 +1,20 @@
 import { login } from './actions'
 
-export default function LoginPage({
-    searchParams,
-}: {
-    searchParams: { error?: string; success?: string }
+export default async function LoginPage(props: {
+    searchParams: Promise<{ error?: string; success?: string }>
 }) {
+    const searchParams = await props.searchParams
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
             <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200">
-                <div className="mb-8 text-center">
-                    <div className="inline-flex h-12 w-12 rounded-full bg-brand-teal items-center justify-center shadow-md mb-4">
-                        <span className="font-heading font-bold text-white text-2xl">M</span>
+                <div className="mb-6 md:mb-8 text-center">
+                    <div className="inline-flex h-10 w-10 md:h-12 md:w-12 rounded-full bg-brand-teal items-center justify-center shadow-md mb-3 md:mb-4">
+                        <span className="font-heading font-bold text-white text-xl md:text-2xl">M</span>
                     </div>
-                    <h1 className="text-4xl font-heading font-bold text-brand-charcoal tracking-tight">
+                    <h1 className="text-2xl md:text-4xl font-heading font-bold text-brand-charcoal tracking-tight">
                         MOBILE BAYKEEPER <span className="text-brand-teal">SSO</span>
                     </h1>
-                    <p className="mt-4 text-brand-charcoal/60 font-medium">
+                    <p className="mt-2 md:mt-4 text-sm md:text-base text-brand-charcoal/60 font-medium">
                         Sign in with your email to access the dashboard.
                     </p>
                 </div>

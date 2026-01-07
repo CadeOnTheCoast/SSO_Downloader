@@ -58,34 +58,34 @@ export function SSOTable({
                         <thead className="bg-slate-50 text-brand-charcoal border-b border-brand-sage/10 font-heading font-bold text-xs tracking-widest uppercase">
                             <tr>
                                 <th
-                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="px-4 md:px-6 py-3 md:py-4 cursor-pointer hover:bg-slate-100 transition-colors"
                                     onClick={() => handleSort('utility_name')}
                                 >
                                     <div className="flex items-center">Utility <SortIcon column="utility_name" /></div>
                                 </th>
                                 <th
-                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="hidden md:table-cell px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
                                     onClick={() => handleSort('county')}
                                 >
                                     <div className="flex items-center">County <SortIcon column="county" /></div>
                                 </th>
                                 <th
-                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="px-4 md:px-6 py-3 md:py-4 cursor-pointer hover:bg-slate-100 transition-colors"
                                     onClick={() => handleSort('date_sso_began')}
                                 >
                                     <div className="flex items-center">Date <SortIcon column="date_sso_began" /></div>
                                 </th>
                                 <th
-                                    className="px-6 py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="px-4 md:px-6 py-3 md:py-4 text-right cursor-pointer hover:bg-slate-100 transition-colors"
                                     onClick={() => handleSort('volume_gallons')}
                                 >
                                     <div className="flex items-center justify-end">Volume (Gal) <SortIcon column="volume_gallons" /></div>
                                 </th>
-                                <th className="px-6 py-4">
+                                <th className="hidden md:table-cell px-6 py-4">
                                     <div className="flex items-center text-brand-sage/80 cursor-default">Location</div>
                                 </th>
                                 <th
-                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="px-4 md:px-6 py-3 md:py-4 cursor-pointer hover:bg-slate-100 transition-colors"
                                     onClick={() => handleSort('receiving_water')}
                                 >
                                     <div className="flex items-center">Receiving Water <SortIcon column="receiving_water" /></div>
@@ -111,15 +111,15 @@ export function SSOTable({
 
                                 return (
                                     <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-brand-charcoal">{record.utility_name}</td>
-                                        <td className="px-6 py-4">{record.county}</td>
-                                        <td className="px-6 py-4 font-mono text-xs">
+                                        <td className="px-4 md:px-6 py-3 md:py-4 font-bold text-brand-charcoal md:whitespace-nowrap min-w-[120px] md:min-w-0 text-xs md:text-sm">{record.utility_name}</td>
+                                        <td className="hidden md:table-cell px-6 py-4">{record.county}</td>
+                                        <td className="px-4 md:px-6 py-3 md:py-4 font-mono text-xs md:whitespace-nowrap">
                                             {record.date_sso_began ? new Date(record.date_sso_began).toLocaleDateString() : 'N/A'}
                                         </td>
-                                        <td className={`px-6 py-4 text-right tabular-nums ${volClass} ${bgClass}`}>
+                                        <td className={`px-4 md:px-6 py-3 md:py-4 text-right tabular-nums ${volClass} ${bgClass} text-xs md:text-sm`}>
                                             {vol.toLocaleString()}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                                             {record.latitude && record.longitude ? (
                                                 <a
                                                     href={`https://www.google.com/maps/search/?api=1&query=${record.latitude},${record.longitude}`}
@@ -133,7 +133,7 @@ export function SSOTable({
                                                 <span className="text-brand-sage/40 text-xs">N/A</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 max-w-[200px] truncate font-medium text-brand-sage" title={record.receiving_water}>
+                                        <td className="px-4 md:px-6 py-3 md:py-4 max-w-[150px] md:max-w-[200px] truncate font-medium text-brand-sage text-xs md:text-sm" title={record.receiving_water}>
                                             {record.receiving_water}
                                         </td>
                                     </tr>

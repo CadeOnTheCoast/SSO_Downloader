@@ -147,34 +147,34 @@ export default function DashboardPage() {
 
     return (
         <div className="flex min-h-screen flex-col bg-white text-brand-charcoal">
-            <header className="border-b border-brand-sage/10 bg-white/80 backdrop-blur px-8 py-5 sticky top-0 z-10 shadow-sm">
+            <header className="border-b border-brand-sage/10 bg-white/80 backdrop-blur px-4 md:px-8 py-4 md:py-5 sticky top-0 z-10 shadow-sm">
                 <div className="mx-auto flex max-w-7xl items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-brand-teal flex items-center justify-center shadow-md">
-                            <span className="font-heading font-bold text-white text-xl">M</span>
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-brand-teal flex items-center justify-center shadow-md">
+                            <span className="font-heading font-bold text-white text-lg md:text-xl">M</span>
                         </div>
-                        <h1 className="text-2xl font-heading font-bold text-brand-charcoal tracking-wider">
-                            Mobile Baykeeper <span className="text-brand-teal">SSO Explorer V5</span>
+                        <h1 className="text-lg md:text-2xl font-heading font-bold text-brand-charcoal tracking-wider">
+                            Mobile Baykeeper <span className="text-brand-teal">SSO Explorer</span>
                         </h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-xs font-bold text-brand-charcoal/40 uppercase tracking-widest border-r border-brand-sage/10 pr-6">
+                        <span className="hidden md:inline-block text-xs font-bold text-brand-charcoal/40 uppercase tracking-widest border-r border-brand-sage/10 pr-6">
                             {userEmail}
                         </span>
                     </div>
                 </div>
             </header>
 
-            <main className="mx-auto w-full max-w-7xl p-8 space-y-8">
+            <main className="mx-auto w-full max-w-7xl p-4 md:p-8 space-y-6 md:space-y-8">
                 {/* Header Section */}
-                <div className="flex justify-between items-center bg-brand-sage/5 p-8 rounded-lg border border-brand-sage/10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-brand-sage/5 p-6 md:p-8 rounded-lg border border-brand-sage/10 gap-4">
                     <div>
-                        <h2 className="text-4xl font-heading font-bold text-brand-charcoal">Dashboard</h2>
-                        <p className="text-brand-charcoal/60 mt-2 font-medium">Real-time overview of sewage overflow events in Alabama.</p>
+                        <h2 className="text-3xl md:text-4xl font-heading font-bold text-brand-charcoal">Dashboard</h2>
+                        <p className="text-brand-charcoal/60 mt-1 md:mt-2 font-medium text-sm md:base">Real-time overview of sewage overflow events in Alabama.</p>
                     </div>
                     <button
                         onClick={handleDownload}
-                        className="bg-brand-teal hover:bg-brand-charcoal text-white font-heading font-bold tracking-widest uppercase px-8 py-3 rounded-md shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+                        className="w-full md:w-auto bg-brand-teal hover:bg-brand-charcoal text-white font-heading font-bold tracking-widest uppercase px-6 md:px-8 py-3 rounded-md shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm md:text-base"
                     >
                         Export Data
                     </button>

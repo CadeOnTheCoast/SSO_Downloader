@@ -4,6 +4,8 @@ from __future__ import annotations
 import io
 import sys
 import json
+import time
+from functools import lru_cache
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -181,7 +183,17 @@ def health_check() -> dict[str, str]:
 
 
 
+
+_OPTIONS_CACHE = None
+_OPTIONS_CACHE_TIME = 0
+OPTIONS_CACHE_TTL = 360  # 6 minutes
+
 def _load_options(client: SSOClient) -> dict[str, object]:
+    global _OPTIONS_CACHE, _OPTIONS_CACHE_TIME
+    now = time.time()
+    if _OPTIONS_CACHE and (now - _OPTIONS_CACHE_TIME < OPTIONS_CACHE_TTL):
+        return _OPTIONS_CACHE
+
     utilities: list[dict[str, object]] = []
     permittees: list[dict[str, object]] = []
     counties = ALABAMA_COUNTIES
@@ -207,7 +219,11 @@ def _load_options(client: SSOClient) -> dict[str, object]:
             for item in DEFAULT_UTILITIES
         ]
 
-    return {"utilities": utilities, "permittees": permittees, "counties": counties}
+
+    res = {"utilities": utilities, "permittees": permittees, "counties": counties}
+    _OPTIONS_CACHE = res
+    _OPTIONS_CACHE_TIME = now
+    return res
 
 
 @app.get("/filters")
@@ -524,6 +540,7 @@ def point_in_polygon(x, y, poly) -> bool:
     return inside
 
 
+@lru_cache(maxsize=4096)
 def get_county(lat: Optional[float], lon: Optional[float]) -> Optional[str]:
     _load_counties()
     if not AL_COUNTY_FEATURES or lat is None or lon is None:
@@ -549,29 +566,58 @@ def get_county(lat: Optional[float], lon: Optional[float]) -> Optional[str]:
     return None
 
 
-def _fetch_all_filtered_records(
-    params: SSOQueryParams, client: SSOClient, default_limit: int = MAX_WEB_RECORDS
+@lru_cache(maxsize=128)
+def _cached_query_results(
+    start_date: Optional[str],
+    end_date: Optional[str],
+    utility_id: Optional[str],
+    utility_ids_json: Optional[str],
+    utility_name: Optional[str],
+    county: Optional[str],
+    limit: Optional[int],
+    permit: Optional[str],
+    permits_json: Optional[str],
 ):
-    """Fetch, normalize, enrich (county), and filter records."""
+    """
+    Internal helper to cache the results of a filtered ArcGIS query.
+    We pass a dummy client parameters to ensure uniqueness if needed, but 
+    usually the singleton behavior is fine.
+    """
+    # Create a fresh client and params for the actual fetch
+    client = SSOClient()
+    
+    # We need to reconstruct SSOQueryParams or similar logic
+    # Actually, it's easier to just move the logic here or pass the query object if it was hashable.
+    # Since it's not, we'll just reconstruct a minimal SSOQueryParams to use its to_sso_query logic.
+    
+    utility_ids = json.loads(utility_ids_json) if utility_ids_json else None
+    permits = json.loads(permits_json) if permits_json else None
+    
+    params = SSOQueryParams(
+        utility_id=utility_id,
+        utility_ids=utility_ids,
+        utility_name=utility_name,
+        permit=permit,
+        permits=permits,
+        county=county,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit
+    )
+    
+    # This logic matches _fetch_all_filtered_records but it's the one we cache
     query = _to_query(params, client)
     
-    python_county_filter = params.county
-    
     # If filtering by county, we must fetch max records to filter in memory
-    if python_county_filter:
-        limit = MAX_WEB_RECORDS
-    else:
-        # Otherwise respect param limit or default
-        # usage of params.limit logic depends on passed params object
-        limit = params.bounded_limit(default=default_limit, maximum=MAX_WEB_RECORDS)
-        
+    python_county_filter = params.county
+    fetch_limit = MAX_WEB_RECORDS if python_county_filter else (params.limit or MAX_WEB_RECORDS)
+    
     try:
         query.validate()
-        raw_records = client.fetch_ssos(query=query, limit=limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except SSOClientError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raw_records = client.fetch_ssos(query=query, limit=fetch_limit)
+    except Exception as exc:
+        # Don't cache failures
+        raise exc
 
     for r in raw_records:
         enrich_est_volume_fields(r)
@@ -592,6 +638,27 @@ def _fetch_all_filtered_records(
          ]
          
     return normalized
+
+
+def _fetch_all_filtered_records(
+    params: SSOQueryParams, client: SSOClient, default_limit: int = MAX_WEB_RECORDS
+):
+    """Fetch, normalize, enrich (county), and filter records."""
+    # Convert list params to JSON strings for hashability in lru_cache
+    utility_ids_json = json.dumps(params.utility_ids) if params.utility_ids else None
+    permits_json = json.dumps(params.permits) if params.permits else None
+    
+    return _cached_query_results(
+        params.start_date,
+        params.end_date,
+        params.utility_id,
+        utility_ids_json,
+        params.utility_name,
+        params.county,
+        params.limit,
+        params.permit,
+        permits_json
+    )
 
 
 def _serialize_record(record) -> dict[str, object]:

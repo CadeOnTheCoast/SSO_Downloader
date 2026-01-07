@@ -2,7 +2,11 @@ import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-    return await updateSession(request)
+    const userAgent = request.headers.get('user-agent') || ''
+    const isMobile = /mobile/i.test(userAgent)
+    const response = await updateSession(request)
+    response.headers.set('x-is-mobile', isMobile ? 'true' : 'false')
+    return response
 }
 
 export const config = {

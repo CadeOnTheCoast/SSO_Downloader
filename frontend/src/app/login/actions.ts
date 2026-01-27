@@ -12,14 +12,23 @@ export async function login(formData: FormData) {
         return redirect('/login?error=Email is required')
     }
 
-    // Pre-validate domain (safety check before sending email)
+    // Pre-validate domain or email (safety check before sending email)
     const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org')
         .split(',')
         .map(d => d.trim().replace(/^@/, '').toLowerCase())
-    const userDomain = email.split('@')[1]?.toLowerCase()
+    const allowedEmails = (process.env.ALLOWED_EMAILS || '')
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(e => e !== '')
 
-    if (!userDomain || !allowedDomains.includes(userDomain)) {
-        return redirect('/login?error=Only authorized domains are allowed')
+    const userDomain = email.split('@')[1]?.toLowerCase()
+    const lowerEmail = email.toLowerCase()
+
+    const isAllowedDomain = userDomain && allowedDomains.includes(userDomain)
+    const isAllowedEmail = allowedEmails.includes(lowerEmail)
+
+    if (!isAllowedDomain && !isAllowedEmail) {
+        return redirect('/login?error=This email or domain is not authorized')
     }
 
     const getURL = async () => {

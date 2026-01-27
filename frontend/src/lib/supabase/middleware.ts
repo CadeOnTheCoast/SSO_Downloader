@@ -61,12 +61,23 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // Domain check for authenticated users
+    // Domain and email check for authenticated users
     if (user && user.email) {
-        const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org').split(',')
-        const userDomain = user.email.split('@')[1]
+        const allowedDomains = (process.env.ALLOWED_DOMAINS || 'mobilebaykeeper.org')
+            .split(',')
+            .map(d => d.trim().replace(/^@/, '').toLowerCase())
+        const allowedEmails = (process.env.ALLOWED_EMAILS || '')
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(e => e !== '')
 
-        if (!allowedDomains.includes(userDomain) && request.nextUrl.pathname !== '/unauthorized') {
+        const userDomain = user.email.split('@')[1]?.toLowerCase()
+        const lowerEmail = user.email.toLowerCase()
+
+        const isAllowedDomain = userDomain && allowedDomains.includes(userDomain)
+        const isAllowedEmail = allowedEmails.includes(lowerEmail)
+
+        if (!isAllowedDomain && !isAllowedEmail && request.nextUrl.pathname !== '/unauthorized') {
             const url = request.nextUrl.clone()
             url.pathname = '/unauthorized'
             return NextResponse.redirect(url)

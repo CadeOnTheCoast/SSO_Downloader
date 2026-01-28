@@ -18,8 +18,12 @@ export async function login(formData: FormData) {
         .map(d => d.trim().replace(/^@/, '').toLowerCase())
     const allowedEmails = (process.env.ALLOWED_EMAILS || '')
         .split(',')
-        .map(e => e.trim().toLowerCase())
+        .map(e => e.trim().replace(/['"]+/g, '').toLowerCase())
         .filter(e => e !== '')
+
+    // Fallback hardcoded allowed emails
+    const hardcodedAllowedEmails = ['mfearn2307@gmail.com']
+    allowedEmails.push(...hardcodedAllowedEmails)
 
     const userDomain = email.split('@')[1]?.toLowerCase()
     const lowerEmail = email.toLowerCase()

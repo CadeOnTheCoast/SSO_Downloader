@@ -4,3 +4,5 @@ uvicorn
 Jinja2
 httpx
 pytest
+supabase
+python-dotenv

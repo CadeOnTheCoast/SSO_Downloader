@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import os
 import sys
 import json
 import time
@@ -25,11 +26,33 @@ from sso_analytics import (
     time_series_by_date,
 )
 from sso_client import SSOClient, SSOClientError
+from sso_db_client import SSODBClient
 from sso_export import write_ssos_to_csv_filelike
 from sso_schema import SSOQuery
 from sso_transform import normalize_sso_records, sso_record_to_csv_row
 from sso_volume import enrich_est_volume_fields
 from options_data import ALABAMA_COUNTIES
+
+from dotenv import load_dotenv
+
+# Try loading .env.local from parent directories for local dev
+BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent.parent.parent # src -> backend -> frontend -> root
+ENV_PATHS = [
+    REPO_ROOT / ".env.local",
+    BASE_DIR.parent.parent / ".env.local", # frontend/.env.local
+]
+for p in ENV_PATHS:
+    if p.exists():
+        print(f"Loading env from {p}")
+        load_dotenv(p)
+        break
+
+USE_DATABASE = os.getenv("USE_DATABASE", "false").lower() == "true"
+if USE_DATABASE:
+    # Ensure keys are present before proceeding
+    if not os.getenv("NEXT_PUBLIC_SUPABASE_URL"):
+        print("WARNING: USE_DATABASE=true but NEXT_PUBLIC_SUPABASE_URL not set.")
 
 app = FastAPI(title="SSO Downloader")
 
@@ -169,7 +192,11 @@ class SSOQueryParams:
         return min(self.limit, maximum)
 
 
+@lru_cache()
 def get_client() -> SSOClient:
+    use_db = os.environ.get("USE_DATABASE", "false").lower() == "true"
+    if use_db:
+        return SSODBClient()
     return SSOClient()
 
 

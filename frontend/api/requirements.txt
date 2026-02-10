@@ -6,3 +6,5 @@ pytest
 pydantic
 python-multipart
 requests
+supabase
+python-dotenv

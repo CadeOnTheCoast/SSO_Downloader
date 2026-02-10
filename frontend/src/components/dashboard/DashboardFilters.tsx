@@ -200,7 +200,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
         setFilters(nextFilters)
         setUtilityInput('')
-        onFilterChange(nextFilters)
+        // onFilterChange removed to enforce "Apply Filters" button click
     }
 
     const togglePermit = (id: string) => {
@@ -219,7 +219,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
 
         setFilters(nextFilters)
-        onFilterChange(nextFilters)
+        // onFilterChange removed to enforce "Apply Filters" button click
     }
 
     const highlightMatch = (text: string, query: string) => {

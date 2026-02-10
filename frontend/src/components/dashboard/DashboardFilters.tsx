@@ -175,8 +175,16 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     const toggleUtility = (id: string) => {
         const current = new Set(selectedUtilityIds)
+        let nextPermits = filters.permits ? [...filters.permits] : []
+
         if (current.has(id)) {
             current.delete(id)
+            // Remove permits belonging to this utility so they don't persist
+            const utility = options?.utilities.find(u => u.id === id)
+            if (utility && utility.permits) {
+                const permitsToRemove = new Set(utility.permits)
+                nextPermits = nextPermits.filter(p => !permitsToRemove.has(p))
+            }
         } else {
             current.add(id)
         }
@@ -186,7 +194,8 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
             ...filters,
             utility_ids: nextIds.length > 0 ? nextIds : undefined,
             utility_id: undefined,
-            permit: undefined
+            permit: undefined,
+            permits: nextPermits.length > 0 ? nextPermits : undefined
         }
 
         setFilters(nextFilters)

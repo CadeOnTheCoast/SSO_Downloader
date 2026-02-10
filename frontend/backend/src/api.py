@@ -249,14 +249,17 @@ def _load_options(client: SSOClient) -> dict[str, object]:
 
 
 @app.get("/filters")
-def list_filters(client: SSOClient = Depends(get_client)) -> dict[str, object]:
+def list_filters(response: Response, client: SSOClient = Depends(get_client)) -> dict[str, object]:
+    # Cache filters for 24 hours (s-maxage) on CDN, 1 hour (max-age) on client
+    # stale-while-revalidate allows serving old content while updating in background
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=600"
     return _load_options(client)
 
 
 @app.get("/api/options")
-def list_options(client: SSOClient = Depends(get_client)) -> dict[str, object]:
+def list_options(response: Response, client: SSOClient = Depends(get_client)) -> dict[str, object]:
     """Alias for UI filter metadata used by the dashboard."""
-
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=600"
     return _load_options(client)
 
 
@@ -341,26 +344,33 @@ def _build_dashboard_payload(params: SSOQueryParams, client: SSOClient) -> dict:
 
 @app.get("/api/ssos/summary")
 def dashboard_summary(
+    response: Response,
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
+    # Cache summary for 5 minutes (300s) on CDN
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
     return _build_dashboard_payload(params, client)
 
 
 @app.get("/summary")
 def summary(
+    response: Response,
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
     """Legacy summary endpoint kept for backward compatibility."""
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
     return _build_dashboard_payload(params, client)
 
 
 @app.get("/series/by_date")
 def series_by_date(
+    response: Response,
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
     records_norm = _fetch_all_filtered_records(
         params, client, default_limit=params.limit or MAX_WEB_RECORDS
     )
@@ -371,9 +381,11 @@ def series_by_date(
 
 @app.get("/series/by_utility")
 def series_by_utility(
+    response: Response,
     params: SSOQueryParams = Depends(),
     client: SSOClient = Depends(get_client),
 ):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
     records_norm = _fetch_all_filtered_records(
         params, client, default_limit=params.limit or MAX_WEB_RECORDS
     )

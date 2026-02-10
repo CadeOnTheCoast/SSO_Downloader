@@ -146,7 +146,7 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
             # Treat values above year 3000 as milliseconds
             if value > 10_000_000_000:
                 value = value / 1000.0
-            return datetime.fromtimestamp(value, tz=timezone.utc)
+            return datetime.fromtimestamp(value, tz=timezone.utc).replace(tzinfo=CENTRAL_TZ)
         except (OSError, OverflowError, ValueError):
             return None
     if isinstance(value, str):

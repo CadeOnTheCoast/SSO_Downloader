@@ -137,10 +137,10 @@ class SSOQueryParams:
 
         # 1. Check for explicit permit filters first
         if self.permit:
-            all_permits.update(_resolve_permits(self.permit))
+            all_permits.add(self.permit)
         if self.permits:
             for pid in self.permits:
-                all_permits.update(_resolve_permits(pid))
+                all_permits.add(pid)
         
         # 2. If NO explicit permits, fall back to utility-wide permits
         if not all_permits:

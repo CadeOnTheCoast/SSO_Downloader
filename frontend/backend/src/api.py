@@ -202,16 +202,38 @@ def _load_options(client: SSOClient) -> dict[str, object]:
         fresh_permittees = client.list_permittees()
         if fresh_permittees:
             permittees = fresh_permittees
-            utilities = [
-                {
+            
+            # Prichard Patch: Ensure AL0046744 is included in Utilities of Prichard (AL0023205)
+            # and remove AL0046744 if it exists as a separate entry to avoid confusion/duplication
+            prichard_id = "AL0023205"
+            missing_permit = "AL0046744"
+            
+            patched_utilities = []
+            for item in fresh_permittees:
+                # Skip the standalone "missing permit" entry if it exists separately
+                if item.get("id") == missing_permit:
+                    continue
+                    
+                u_obj = {
                     "id": item.get("id"),
                     "name": item.get("name"),
                     "slug": item.get("slug"),
-                    "permits": item.get("permits", []),
-                    "aliases": item.get("aliases", []),
+                    "permits": list(item.get("permits", [])), # Safe copy
+                    "aliases": list(item.get("aliases", [])), # Safe copy
                 }
-                for item in fresh_permittees
-            ]
+                
+                # Patch Prichard
+                if item.get("id") == prichard_id:
+                    current_permits = u_obj["permits"]
+                    if missing_permit not in current_permits:
+                        # Add it
+                        u_obj["permits"].append(missing_permit)
+                        # Ensure uniqueness just in case
+                        u_obj["permits"] = sorted(list(set(u_obj["permits"])))
+                        
+                patched_utilities.append(u_obj)
+            
+            utilities = patched_utilities
     except Exception:
         utilities = DEFAULT_UTILITIES
         permittees = [

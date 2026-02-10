@@ -351,6 +351,11 @@ def _utility_group_key(record: SSORecord) -> Optional[str]:
     return None
 
 
+def _get_facility_name(record: SSORecord) -> Optional[str]:
+    raw = record.raw
+    return str(raw.get("facility_site_name") or raw.get("facility") or raw.get("facility_name") or "") or None
+
+
 def summarize_by_utility(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
     """Summarize spills grouped by utility id/name.
 
@@ -376,14 +381,36 @@ def summarize_by_utility(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
         # Preserve a readable utility_name even when grouped by ID only
         if not bucket.get("utility_name") and record.utility_name:
             bucket["utility_name"] = record.utility_name
+        
+        # Capture facility name if available (first one found wins)
+        if not bucket.get("facility_name"):
+            bucket["facility_name"] = _get_facility_name(record)
 
         bucket["spill_count"] += 1
         volume = _usable_volume(record)
         if volume is not None:
             bucket["volumes"].append(volume)
 
+    # 2. Count occurrences of each name to detect duplicates
+    name_counts: Dict[str, int] = {}
+    for data in buckets.values():
+        name = data.get("utility_name")
+        if name:
+            name_counts[name] = name_counts.get(name, 0) + 1
+
     rows: List[Dict[str, Any]] = []
     for key, data in buckets.items():
+        original_name = data.get("utility_name") or key
+        display_name = original_name
+
+        # 3. Disambiguate if needed
+        if name_counts.get(original_name, 0) > 1:
+            facility = data.get("facility_name")
+            if facility:
+                display_name = f"{original_name} ({facility})"
+            elif data.get("utility_id") and data.get("utility_id") != original_name:
+                display_name = f"{original_name} ({data['utility_id']})"
+
         volumes = data["volumes"]
         total_volume = float(sum(volumes)) if volumes else 0.0
         avg_volume = mean(volumes) if volumes else None
@@ -391,7 +418,7 @@ def summarize_by_utility(records: Sequence[SSORecord]) -> List[Dict[str, Any]]:
         rows.append(
             {
                 "utility_id": data.get("utility_id"),
-                "utility_name": data.get("utility_name") or key,
+                "utility_name": display_name,
                 "spill_count": data["spill_count"],
                 "total_volume": total_volume,
                 "avg_volume": avg_volume,
@@ -529,11 +556,33 @@ def summarize_top_utilities(records: Sequence[SSORecord]) -> List[Dict[str, Any]
                 "total_volume_gallons": 0.0,
             },
         )
+        
+        if not bucket.get("facility_name"):
+            bucket["facility_name"] = _get_facility_name(record)
+
         bucket["spill_count"] += 1
         volume = _best_volume(record)
         bucket["total_volume_gallons"] += volume if volume is not None else 0.0
 
-    rows = list(buckets.values())
+    # Disambiguate names
+    name_counts: Dict[str, int] = {}
+    for data in buckets.values():
+        name = data.get("utility_name")
+        if name:
+            name_counts[name] = name_counts.get(name, 0) + 1
+
+    rows = []
+    for data in buckets.values():
+        row = dict(data)
+        original_name = row.get("utility_name")
+        if original_name and name_counts.get(original_name, 0) > 1:
+            facility = row.get("facility_name")
+            if facility:
+                row["utility_name"] = f"{original_name} ({facility})"
+            elif row.get("utility_id") and row.get("utility_id") != original_name:
+                row["utility_name"] = f"{original_name} ({row['utility_id']})"
+        rows.append(row)
+
     rows.sort(
         key=lambda row: (
             -row["total_volume_gallons"],

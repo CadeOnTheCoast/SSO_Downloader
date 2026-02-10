@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { FilterOptions, FilterState, fetchFilters } from '@/lib/api'
 import { Loader2, Search, Calendar, MapPin, ListFilter, X, ChevronDown } from 'lucide-react'
 
@@ -94,41 +94,50 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         onFilterChange(filters)
     }
 
-    // Enhanced utility filtering (Name, Slug, ID, Aliases) with "Google-style" word completion
-    const filteredUtilities = (options?.utilities.filter(u => {
-        const query = utilityInput.toLowerCase().trim()
-        if (!query) return true
+    // 1. SAFE UTILITY FILTERING
+    const filteredUtilities = useMemo(() => {
+        if (!options?.utilities) return []
 
-        const wordStartsWith = (text: string) => {
-            const words = text.toLowerCase().split(/[\s\-_]+/)
-            return words.some(w => w.startsWith(query))
+        const query = utilityInput.toLowerCase().trim()
+
+        // Safety: Create a shallow copy to prevent in-place mutation of state
+        let result = [...options.utilities]
+
+        if (query) {
+            const wordStartsWith = (text: string) => {
+                if (!text) return false
+                const words = text.toLowerCase().split(/[\s\-_]+/)
+                return words.some(w => w.startsWith(query))
+            }
+
+            result = result.filter(u => {
+                const nameMatch = wordStartsWith(u.name)
+                const slugMatch = wordStartsWith(u.slug)
+                const aliasMatch = (u.aliases || []).some(a => wordStartsWith(a))
+                const idMatch = u.id.toLowerCase().includes(query)
+                return nameMatch || slugMatch || aliasMatch || idMatch
+            })
         }
 
-        const nameMatch = wordStartsWith(u.name)
-        const slugMatch = wordStartsWith(u.slug)
-        const aliasMatch = (u.aliases || []).some(a => wordStartsWith(a))
-        const idMatch = u.id.toLowerCase().includes(query) // Keep ID flexible for numeric searches
+        return result.sort((a, b) => {
+            if (!query) return 0
 
-        return nameMatch || slugMatch || aliasMatch || idMatch
-    }) || []).sort((a, b) => {
-        const query = utilityInput.toLowerCase().trim()
-        if (!query) return 0
+            const aName = a.name.toLowerCase()
+            const bName = b.name.toLowerCase()
 
-        const aName = a.name.toLowerCase()
-        const bName = b.name.toLowerCase()
+            // Exact Match Priority
+            if (aName === query || a.id.toLowerCase() === query) return -1
+            if (bName === query || b.id.toLowerCase() === query) return 1
 
-        // 1. Exact Name/ID Match
-        if (aName === query || a.id.toLowerCase() === query) return -1
-        if (bName === query || b.id.toLowerCase() === query) return 1
+            // Starts With Priority
+            const aStarts = aName.startsWith(query)
+            const bStarts = bName.startsWith(query)
+            if (aStarts && !bStarts) return -1
+            if (!aStarts && bStarts) return 1
 
-        // 2. Starts With Name (Prefix)
-        const aStarts = aName.startsWith(query)
-        const bStarts = bName.startsWith(query)
-        if (aStarts && !bStarts) return -1
-        if (!aStarts && bStarts) return 1
-
-        return 0
-    }).slice(0, 50)
+            return 0
+        }).slice(0, 50)
+    }, [options?.utilities, utilityInput])
 
     // Suggestion logic for "Did you mean"
     const getSuggestion = () => {
@@ -144,14 +153,18 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     const suggestion = getSuggestion()
 
-    // Permit ID filtering
-    const filteredPermits = options?.utilities.filter(u => {
-        const query = permitInput.toLowerCase()
-        if (!query) return false
-        return u.id.toLowerCase().includes(query) ||
-            u.slug.toLowerCase().includes(query) ||
-            u.name.toLowerCase().includes(query)
-    }).slice(0, 20) || []
+    // 2. SAFE PERMIT FILTERING
+    const filteredPermits = useMemo(() => {
+        if (!options?.utilities) return []
+        const query = permitInput.toLowerCase().trim()
+        if (!query) return []
+
+        return options.utilities.filter(u => {
+            return u.id.toLowerCase().includes(query) ||
+                u.slug.toLowerCase().includes(query) ||
+                u.name.toLowerCase().includes(query)
+        }).slice(0, 20)
+    }, [options?.utilities, permitInput])
 
     const filteredCounties = options?.counties.filter(c =>
         c.toLowerCase().includes(countySearch.toLowerCase())
@@ -201,8 +214,12 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     }
 
     const highlightMatch = (text: string, query: string) => {
-        if (!query) return text
-        const parts = text.split(new RegExp(`(${query})`, 'gi'))
+        if (!query || !text) return text
+
+        // Escape special regex characters to prevent crashes if user types '(', '[', etc.
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+        const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'))
         return (
             <span>
                 {parts.map((part, i) =>
@@ -272,9 +289,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                         {showUtilityDropdown && (
                             <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
                                 {filteredUtilities.length > 0 ? (
-                                    filteredUtilities.map(u => (
+                                    filteredUtilities.map((u, i) => (
                                         <button
-                                            key={u.id}
+                                            key={`${u.id}-${i}`}
                                             type="button"
                                             onClick={() => toggleUtility(u.id)}
                                             className={`w-full text-left px-4 py-3 text-sm transition-colors border-b border-brand-sage/5 last:border-0 ${selectedUtilityIds.includes(u.id)
@@ -398,9 +415,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                 {showPermitDropdown && permitInput.length > 0 && (
                                     <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
                                         {filteredPermits.length > 0 ? (
-                                            filteredPermits.map(u => (
+                                            filteredPermits.map((u, i) => (
                                                 <button
-                                                    key={u.id}
+                                                    key={`${u.id}-${i}`}
                                                     type="button"
                                                     onClick={() => {
                                                         setFilters(prev => ({ ...prev, permit: u.id, utility_id: undefined, utility_ids: undefined }))

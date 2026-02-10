@@ -21,9 +21,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
         }
     })
     const [loadingOptions, setLoadingOptions] = useState(true)
-    const [utilitySearch, setUtilitySearch] = useState('') // Debounced query for filtering
     const [utilityInput, setUtilityInput] = useState('')   // Instant input value
-    const [permitSearch, setPermitSearch] = useState('')   // Debounced query for filtering
     const [permitInput, setPermitInput] = useState('')     // Instant input value
     const [countySearch, setCountySearch] = useState('')
     const [showUtilityDropdown, setShowUtilityDropdown] = useState(false)
@@ -33,15 +31,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
     const permitRef = useRef<HTMLDivElement>(null)
     const countyRef = useRef<HTMLDivElement>(null)
 
-    useEffect(() => {
-        const timer = setTimeout(() => setUtilitySearch(utilityInput), 300)
-        return () => clearTimeout(timer)
-    }, [utilityInput])
 
-    useEffect(() => {
-        const timer = setTimeout(() => setPermitSearch(permitInput), 300)
-        return () => clearTimeout(timer)
-    }, [permitInput])
 
     useEffect(() => {
         fetchFilters()
@@ -89,9 +79,8 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
             limit: 2000
         }
         setFilters(resetFilters)
-        setUtilitySearch('')
+        setFilters(resetFilters)
         setUtilityInput('')
-        setPermitSearch('')
         setPermitInput('')
         setCountySearch('')
         setShowUtilityDropdown(false)
@@ -107,7 +96,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     // Enhanced utility filtering (Name, Slug, ID, Aliases) with "Google-style" word completion
     const filteredUtilities = (options?.utilities.filter(u => {
-        const query = utilitySearch.toLowerCase().trim()
+        const query = utilityInput.toLowerCase().trim()
         if (!query) return true
 
         const wordStartsWith = (text: string) => {
@@ -122,7 +111,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
         return nameMatch || slugMatch || aliasMatch || idMatch
     }) || []).sort((a, b) => {
-        const query = utilitySearch.toLowerCase().trim()
+        const query = utilityInput.toLowerCase().trim()
         if (!query) return 0
 
         const aName = a.name.toLowerCase()
@@ -143,8 +132,8 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     // Suggestion logic for "Did you mean"
     const getSuggestion = () => {
-        if (utilitySearch.length < 3 || filteredUtilities.length > 0 || !options) return null
-        const query = utilitySearch.toLowerCase()
+        if (utilityInput.length < 3 || filteredUtilities.length > 0 || !options) return null
+        const query = utilityInput.toLowerCase()
         // Simple heuristic: find utility that starts with the query, or closest match
         const suggestion = options.utilities.find(u =>
             u.name.toLowerCase().startsWith(query.slice(0, 3)) ||
@@ -157,7 +146,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
 
     // Permit ID filtering
     const filteredPermits = options?.utilities.filter(u => {
-        const query = permitSearch.toLowerCase()
+        const query = permitInput.toLowerCase()
         if (!query) return false
         return u.id.toLowerCase().includes(query) ||
             u.slug.toLowerCase().includes(query) ||
@@ -297,7 +286,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
                                                         <div className={`font-bold ${selectedUtilityIds.includes(u.id) ? 'text-brand-teal' : 'text-brand-charcoal'}`}>
-                                                            {highlightMatch(u.name, utilitySearch)}
+                                                            {highlightMatch(u.name, utilityInput)}
                                                         </div>
                                                         {(u.permits || []).length > 1 && (
                                                             <span className="px-1.5 py-0.5 bg-brand-teal/10 text-brand-teal text-[9px] font-bold rounded uppercase tracking-tighter">
@@ -307,21 +296,21 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                         {selectedUtilityIds.includes(u.id) && <span className="text-brand-teal ml-2">✓</span>}
                                                     </div>
                                                     {/* Show matched alias if different from canonical name */}
-                                                    {utilitySearch.length > 1 && (u.aliases || []).find(a =>
-                                                        a.toLowerCase().includes(utilitySearch.toLowerCase()) &&
+                                                    {utilityInput.length > 1 && (u.aliases || []).find(a =>
+                                                        a.toLowerCase().includes(utilityInput.toLowerCase()) &&
                                                         a.toLowerCase() !== u.name.toLowerCase()
                                                     ) && (
                                                             <div className="text-[10px] text-brand-sage italic mt-0.5">
-                                                                alias: "{highlightMatch((u.aliases || []).find(a => a.toLowerCase().includes(utilitySearch.toLowerCase()))!, utilitySearch)}"
+                                                                alias: "{highlightMatch((u.aliases || []).find(a => a.toLowerCase().includes(utilityInput.toLowerCase()))!, utilityInput)}"
                                                             </div>
                                                         )}
                                                 </div>
-                                                <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{highlightMatch(u.slug, utilitySearch)}</div>
+                                                <div className="text-[10px] text-brand-teal font-mono bg-brand-teal/5 px-1.5 py-0.5 rounded">{highlightMatch(u.slug, utilityInput)}</div>
                                             </div>
                                             <div className="mt-1 flex flex-wrap gap-1">
                                                 {(u.permits || []).slice(0, 3).map(p => (
                                                     <span key={p} className="text-[10px] text-brand-sage font-mono bg-slate-100 px-1 rounded">
-                                                        {highlightMatch(p, utilitySearch)}
+                                                        {highlightMatch(p, utilityInput)}
                                                     </span>
                                                 ))}
                                                 {(u.permits || []).length > 3 && (
@@ -406,7 +395,7 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                     }}
                                     autoComplete="off"
                                 />
-                                {showPermitDropdown && permitSearch.length > 0 && (
+                                {showPermitDropdown && permitInput.length > 0 && (
                                     <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-brand-sage/20 rounded-lg shadow-xl py-1">
                                         {filteredPermits.length > 0 ? (
                                             filteredPermits.map(u => (
@@ -420,9 +409,9 @@ export function DashboardFilters({ onFilterChange, isLoading }: DashboardFilters
                                                     }}
                                                     className="w-full text-left px-4 py-3 text-sm hover:bg-brand-sage/5 transition-colors border-b border-brand-sage/5 last:border-0"
                                                 >
-                                                    <div className="font-mono text-xs font-bold text-brand-teal">{highlightMatch(u.id, permitSearch)}</div>
-                                                    <div className="text-[10px] text-brand-sage truncate">{highlightMatch(u.name, permitSearch)}</div>
-                                                    <div className="text-[9px] text-brand-sage/60 font-mono italic">{highlightMatch(u.slug, permitSearch)}</div>
+                                                    <div className="font-mono text-xs font-bold text-brand-teal">{highlightMatch(u.id, permitInput)}</div>
+                                                    <div className="text-[10px] text-brand-sage truncate">{highlightMatch(u.name, permitInput)}</div>
+                                                    <div className="text-[9px] text-brand-sage/60 font-mono italic">{highlightMatch(u.slug, permitInput)}</div>
                                                 </button>
                                             ))
                                         ) : (
